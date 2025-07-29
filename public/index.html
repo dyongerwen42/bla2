@@ -33,20 +33,23 @@
         @keyframes flicker { 50% { opacity: 0.85; text-shadow: 0 0 12px var(--holo-cyan), 0 0 22px var(--holo-cyan); } }
         @keyframes text-shine { to { background-position: -200% center; } }
         @keyframes background-pan { 0% { background-position: 0% 0%; } 100% { background-position: -200% -200%; } }
-        @keyframes power-on { from { opacity: 0; transform: scale(0.9) rotateX(20deg); } to { opacity: 1; transform: scale(1) rotateX(10deg); } }
+        @keyframes power-on { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: scale(1); } }
         @keyframes scanlines { from { background-position: 0 0; } to { background-position: 0 100%; } }
         @keyframes connect-pulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 15px var(--holo-cyan); } 50% { transform: scale(1.05); box-shadow: 0 0 30px var(--holo-cyan); } }
         @keyframes reel-glitch { 0%, 100% { transform: skewX(0); } 20% { transform: skewX(2deg); } 40% { transform: skewX(-2deg); } 60% { transform: skewX(1deg); } 80% { transform: skewX(-1deg); } }
         
-        /* -- New Startup Animations -- */
         @keyframes startup-fade-in { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes startup-glitch { 0% { transform: translate(0); } 20% { transform: translate(-3px, 3px); } 40% { transform: translate(-3px, -3px); } 60% { transform: translate(3px, 3px); } 80% { transform: translate(3px, -3px); } 100% { transform: translate(0); } }
-        @keyframes startup-glitch-flicker { 0% { opacity: 1; } 14% { opacity: 1; } 15% { opacity: 0.2; } 16% { opacity: 1; } 30% { opacity: 1; } 31% { opacity: 0.5; } 32% { opacity: 1; } 70% { opacity: 1; } 71% { opacity: 0.1; } 72% { opacity: 1; } 100% { opacity: 1; } }
         @keyframes startup-scanline { 100% { background-position: 0% 100%; } }
 
         /* --- Base & Body --- */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html { scroll-behavior: smooth; }
+        html, body {
+            width: 100%;
+            overflow-x: hidden;
+        }
+        html {
+            scroll-behavior: smooth;
+        }
         body {
             font-family: 'Roboto Mono', monospace;
             background-color: var(--bg-color);
@@ -56,7 +59,6 @@
             align-items: center;
             min-height: 100vh;
             padding: 1rem;
-            overflow: hidden;
             background-image:
                 radial-gradient(ellipse at center, rgba(148, 34, 255, 0.1), transparent 60%),
                 linear-gradient(var(--grid-color) 1px, transparent 1px),
@@ -68,27 +70,38 @@
         #particle-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.5; }
 
         /* --- Main Machine Container --- */
-        .machine-container { width: 100%; max-width: 1200px; z-index: 1; perspective: 2500px; }
+        .machine-container {
+            width: 100%;
+            max-width: 1200px;
+            z-index: 1;
+        }
+
+        /* MOBILE DEFAULT: .machine-body has no visuals */
         .machine-body {
-            background: radial-gradient(circle at 50% 0%, #2a3447, transparent 70%), var(--machine-bg);
-            border: 1px solid var(--machine-border);
-            border-radius: 30px;
-            padding: 1rem;
-            box-shadow: 0 25px 70px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.05), inset 0 0 50px rgba(0,0,0,0.8);
             transform-style: preserve-3d;
-            transform: rotateX(10deg);
             position: relative;
             opacity: 0;
             animation: power-on 1.5s 0.5s ease-out forwards;
             transition: box-shadow 0.5s ease;
             display: grid;
             gap: 1.5rem;
-            grid-template-areas: "main" "payouts" "pending";
+            grid-template-areas:
+                "main"
+                "payouts"
+                "pending";
         }
-        .machine-body.win-state { box-shadow: 0 0 50px var(--win-color), 0 25px 70px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.05); }
-
+        
         /* --- Screens & Panels --- */
-        .main-console, .side-panel {
+        /* MOBILE: main-console is transparent, side-panels are cards */
+        .main-console {
+            grid-area: main;
+            background: none;
+            border: none;
+            padding: 0;
+            box-shadow: none;
+            backdrop-filter: none;
+        }
+        .side-panel {
             background: var(--panel-bg);
             border: 1px solid var(--machine-border);
             border-radius: 15px;
@@ -97,7 +110,6 @@
             box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
             transform-style: preserve-3d;
         }
-        .main-console { grid-area: main; transform: translateZ(40px); }
         .pending-panel { grid-area: pending; }
         .payouts-panel { grid-area: payouts; }
 
@@ -112,7 +124,7 @@
         }
         .main-screen::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%); background-size: 100% 3px; pointer-events: none; animation: scanlines 20s linear infinite; }
 
-        .machine-header { text-align: center; margin-bottom: 1rem; transform: translateZ(20px); }
+        .machine-header { text-align: center; margin-bottom: 1rem; }
         .machine-header h1 { font-family: 'Orbitron', sans-serif; font-size: clamp(1.8rem, 5vw, 2.5rem); text-transform: uppercase; background: linear-gradient(90deg, var(--holo-cyan), #fff, var(--holo-magenta), var(--holo-cyan)); background-size: 200% auto; color: #000; background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: text-shine 5s linear infinite reverse, flicker 4s infinite; }
         #jackpot-display { font-size: clamp(2rem, 5vw, 3rem); color: var(--holo-gold); text-shadow: 0 0 10px var(--holo-gold), 0 0 25px var(--holo-gold); transition: color 0.3s, opacity 0.3s; }
         #jackpot-display.stale { color: var(--text-muted); opacity: 0.7; }
@@ -124,9 +136,7 @@
         .reel-icons { position: absolute; top: 0; left: 0; width: 100%; transition: top 2s cubic-bezier(.32,1.5,.55,1.2), filter 0.3s ease; }
         .reel-icons i { font-size: clamp(50px, 10vw, 80px); line-height: clamp(90px, 18vw, 140px); text-align: center; width: 100%; display: block; text-shadow: 0 0 8px currentColor, 0 0 20px currentColor, 0 0 30px #fff; transition: transform 0.2s; }
         
-        /* Symbol Colors */
-        .fa-gem { color: #d755ff; } .fa-diamond { color: #00f6ff; } .fa-star { color: #ffc800; } .fa-heart { color: #ff2a6d; } .fa-bell { color: #ff9a00; } .fa-clover { color: #00ff6a; } .fa-lemon { color: #f8ff38; }
-        .fa-skull { color: #6c757d; }
+        .fa-gem { color: #d755ff; } .fa-diamond { color: #00f6ff; } .fa-star { color: #ffc800; } .fa-heart { color: #ff2a6d; } .fa-bell { color: #ff9a00; } .fa-clover { color: #00ff6a; } .fa-lemon { color: #f8ff38; } .fa-skull { color: #6c757d; }
 
         .control-panel { padding-top: 1rem; margin-top: 1rem; text-align: center; position: relative; border-top: 1px solid var(--machine-border); }
         #result-message { font-size: clamp(1rem, 4vw, 1.4rem); text-transform: uppercase; min-height: 30px; transition: all 0.3s; letter-spacing: 1px; margin-top: 0.5rem; }
@@ -140,7 +150,6 @@
         .side-panel ul::-webkit-scrollbar-track { background: transparent; }
         .side-panel ul::-webkit-scrollbar-thumb { background: var(--holo-cyan); border-radius: 4px; }
         .side-panel li { background: rgba(0,0,0,0.2); padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid var(--machine-border); transition: all 0.2s; font-size: 0.9rem; }
-        .side-panel li:hover { border-left-color: var(--holo-cyan); background: rgba(0, 229, 255, 0.1); transform: translateX(5px); }
         #pending-spins-list .address { color: var(--text-color); }
         #pending-spins-list .countdown { color: var(--holo-gold); font-weight: bold; }
         #winners-list .time { color: var(--text-muted); }
@@ -159,100 +168,65 @@
         .rules-list li { background: none; padding: 0.4rem 0.5rem; margin-bottom: 0.25rem; border-left: 3px solid var(--holo-magenta); display: flex; align-items: center; text-align: left; max-width: 380px; margin-left: auto; margin-right: auto; }
         .rule-icon { margin-right: 0.75rem; color: var(--holo-cyan); width: 20px; text-align: center; }
 
-        /* --- Audio Unlock Overlay (NEW & IMPROVED) --- */
-        #audio-unlock-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(1, 4, 10, 0.95);
-            backdrop-filter: blur(10px);
-            display: flex; justify-content: center; align-items: center;
-            z-index: 100; padding: 1rem;
-            opacity: 1; transition: opacity 0.5s ease-out;
-        }
-
-        .startup-box {
-            position: relative;
-            display: flex; flex-direction: column; align-items: center; text-align: center;
-            width: 100%; max-width: 500px;
-            padding: 2.5rem 2rem;
-            background: linear-gradient(145deg, rgba(15, 23, 36, 0.5), rgba(12, 16, 22, 0.5));
-            border: 1px solid var(--machine-border);
-            box-shadow: 0 0 40px rgba(0,0,0,0.5), inset 0 0 30px rgba(0,0,0,0.4);
-            animation: startup-fade-in 1s ease-out;
-            overflow: hidden;
-        }
-        .startup-box::before {
-            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 200%;
-            background: linear-gradient(0deg, transparent 50%, rgba(0, 229, 255, 0.1) 50%);
-            background-size: 100% 4px;
-            animation: startup-scanline 10s linear infinite;
-        }
-
-        .corner {
-            position: absolute; width: 25px; height: 25px;
-            border-style: solid; border-color: var(--holo-cyan);
-            opacity: 0; animation: startup-fade-in 1s 0.5s forwards;
-        }
+        /* --- Audio Unlock Overlay --- */
+        #audio-unlock-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(1, 4, 10, 0.95); backdrop-filter: blur(10px); display: flex; justify-content: center; align-items: center; z-index: 100; padding: 1rem; opacity: 1; transition: opacity 0.5s ease-out; }
+        .startup-box { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; width: 100%; max-width: 500px; padding: 2.5rem 2rem; background: linear-gradient(145deg, rgba(15, 23, 36, 0.5), rgba(12, 16, 22, 0.5)); border: 1px solid var(--machine-border); box-shadow: 0 0 40px rgba(0,0,0,0.5), inset 0 0 30px rgba(0,0,0,0.4); animation: startup-fade-in 1s ease-out; overflow: hidden; }
+        .startup-box::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 200%; background: linear-gradient(0deg, transparent 50%, rgba(0, 229, 255, 0.1) 50%); background-size: 100% 4px; animation: startup-scanline 10s linear infinite; }
+        .corner { position: absolute; width: 25px; height: 25px; border-style: solid; border-color: var(--holo-cyan); opacity: 0; animation: startup-fade-in 1s 0.5s forwards; }
         .corner.top-left { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
         .corner.top-right { top: -1px; right: -1px; border-width: 2px 2px 0 0; }
         .corner.bottom-left { bottom: -1px; left: -1px; border-width: 0 0 2px 2px; }
         .corner.bottom-right { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
-
-        #startup-logo {
-            max-width: 220px; width: 70%;
-            margin-bottom: 1.5rem;
-            opacity: 0;
-            animation: startup-glitch-flicker 1.5s 0.8s forwards;
-        }
+        #startup-logo { max-width: 220px; width: 70%; margin-bottom: 1.5rem; opacity: 0; animation: startup-fade-in 1.2s 0.8s forwards; }
+        #startup-title { font-family: 'Orbitron', sans-serif; font-size: clamp(2rem, 10vw, 3.5rem); text-transform: uppercase; color: var(--text-color); text-shadow: 0 0 8px var(--holo-cyan), 0 0 15px var(--holo-cyan); position: relative; opacity: 0; animation: flicker 4s 1.2s infinite, startup-fade-in 0.5s 1.2s forwards; }
+        #startup-text { font-size: clamp(0.9rem, 3vw, 1.1rem); color: var(--text-muted); letter-spacing: 0.5px; margin: 0.5rem 0 2rem 0; opacity: 0; animation: startup-fade-in 1s 1.5s forwards; }
+        #connect-button { font-family: 'Orbitron', sans-serif; font-size: 1.25rem; color: var(--text-color); background: transparent; border: 2px solid var(--holo-cyan); padding: 15px 35px; border-radius: 5px; cursor: pointer; text-transform: uppercase; letter-spacing: 2px; transition: all 0.3s ease; opacity: 0; animation: connect-pulse 2s 1.8s infinite, startup-fade-in 1s 1.8s forwards; }
+        #connect-button:hover { background: var(--holo-cyan); color: var(--bg-color); box-shadow: 0 0 25px var(--holo-cyan); }
         
-        #startup-title {
-            font-family: 'Orbitron', sans-serif;
-            font-size: clamp(2rem, 10vw, 3.5rem);
-            text-transform: uppercase; color: var(--text-color);
-            text-shadow: 0 0 5px var(--holo-cyan), 0 0 10px var(--holo-cyan);
-            position: relative;
-            opacity: 0; animation: startup-fade-in 0.1s 1.2s forwards;
-        }
-        #startup-title::before, #startup-title::after {
-            content: attr(data-text);
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: #0c1016; overflow: hidden;
-        }
-        #startup-title::before {
-            left: 2px; text-shadow: -2px 0 var(--holo-magenta);
-            animation: startup-glitch 2s infinite linear alternate-reverse;
-        }
-        #startup-title::after {
-            left: -2px; text-shadow: -2px 0 var(--holo-gold), 2px 2px var(--holo-cyan);
-            animation: startup-glitch 3s infinite linear alternate-reverse;
-        }
-
-        #startup-text {
-            font-size: clamp(0.9rem, 3vw, 1.1rem);
-            color: var(--text-muted); letter-spacing: 0.5px;
-            margin: 0.5rem 0 2rem 0;
-            opacity: 0; animation: startup-fade-in 1s 1.5s forwards;
-        }
-
-        #connect-button {
-            font-family: 'Orbitron', sans-serif; font-size: 1.25rem;
-            color: var(--text-color); background: transparent;
-            border: 2px solid var(--holo-cyan); padding: 15px 35px; border-radius: 5px;
-            cursor: pointer; text-transform: uppercase; letter-spacing: 2px;
-            transition: all 0.3s ease;
-            opacity: 0; animation: connect-pulse 2s 1.8s infinite, startup-fade-in 1s 1.8s forwards;
-        }
-        #connect-button:hover {
-            background: var(--holo-cyan);
-            color: var(--bg-color);
-            box-shadow: 0 0 25px var(--holo-cyan);
-        }
-        
+        /* DESKTOP & WIDE TABLET STYLES (>= 1024px) */
         @media (min-width: 1024px) {
-            .machine-body { grid-template-columns: 280px 1fr 280px; grid-template-areas: "pending main payouts"; align-items: start; padding: 2rem; }
-            .pending-panel { transform: translateZ(15px) translateX(-10px) rotateY(8deg); }
-            .payouts-panel { transform: translateZ(15px) translateX(10px) rotateY(-8deg); }
-            .side-panel ul { max-height: 120px; }
-            #paytable-list { max-height: initial; }
+            .machine-container {
+                perspective: 2500px;
+            }
+            .machine-body {
+                /* Add the box styles back for desktop */
+                background: radial-gradient(circle at 50% 0%, #2a3447, transparent 70%), var(--machine-bg);
+                border: 1px solid var(--machine-border);
+                border-radius: 30px;
+                padding: 2rem;
+                box-shadow: 0 25px 70px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.05), inset 0 0 50px rgba(0,0,0,0.8);
+
+                /* Add the 3D layout and transform back for desktop */
+                grid-template-columns: 280px 1fr 280px;
+                grid-template-areas: "pending main payouts";
+                align-items: start;
+                transform: rotateX(10deg);
+            }
+            .machine-body.win-state {
+                 box-shadow: 0 0 50px var(--win-color), 0 25px 70px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.05);
+            }
+            .main-console {
+                /* Restore desktop appearance */
+                background: var(--panel-bg);
+                border: 1px solid var(--machine-border);
+                border-radius: 15px;
+                padding: 1rem;
+                backdrop-filter: blur(8px);
+                box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
+                transform: translateZ(40px);
+            }
+            .pending-panel {
+                transform: translateZ(15px) translateX(-10px) rotateY(8deg);
+            }
+            .payouts-panel {
+                transform: translateZ(15px) translateX(10px) rotateY(-8deg);
+            }
+            .side-panel ul {
+                max-height: 120px;
+            }
+            #paytable-list {
+                max-height: initial;
+            }
         }
     </style>
 </head>
@@ -266,7 +240,7 @@
         <div class="corner bottom-left"></div><div class="corner bottom-right"></div>
         
         <img src="/logo.gif" alt="PUMP SLOTS Logo" id="startup-logo">
-        <h1 id="startup-title" data-text="PUMP SLOTS">PUMP SLOTS</h1>
+        <h1 id="startup-title">PUMP SLOTS</h1>
         <p id="startup-text">A retro-futuristic slot machine on the blockchain.</p>
         <button id="connect-button">Enter Arcade</button>
     </div>
@@ -401,7 +375,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (const name of outcome.symbols) {
             if (SYMBOLS.findIndex(s => s.name === name) === -1) {
                 console.error(`Symbol '${name}' from backend not found in frontend SYMBOLS array. Aborting spin.`);
-                isAnimating = false; // Prevent getting stuck
+                isAnimating = false;
                 return;
             }
         }
@@ -590,7 +564,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 animateParticles();
                 window.addEventListener('resize', resizeCanvas);
                 connectToServer();
-            }, 500); // Wait for fade-out transition
+            }, 500);
         }, { once: true });
     }
     
