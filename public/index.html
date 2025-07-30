@@ -138,6 +138,19 @@
         .reel-icons i { font-size: clamp(45px, 10vw, 80px); line-height: clamp(80px, 18vw, 140px); text-align: center; width: 100%; display: block; text-shadow: 0 0 8px currentColor, 0 0 20px currentColor, 0 0 30px #fff; transition: transform 0.2s; }
         
         .fa-gem { color: #d755ff; } .fa-diamond { color: #00f6ff; } .fa-star { color: #ffc800; } .fa-heart { color: #ff2a6d; } .fa-bell { color: #ff9a00; } .fa-clover { color: #00ff6a; } .fa-lemon { color: #f8ff38; } .fa-skull { color: #6c757d; }
+        
+        /* ADDED: Style for the full address display */
+        #current-spinner-address {
+            font-size: clamp(0.75rem, 2.5vw, 0.9rem);
+            color: var(--text-muted);
+            text-shadow: 0 0 5px rgba(0, 229, 255, 0.5);
+            margin-top: 1rem;
+            min-height: 20px;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+            word-break: break-all;
+            text-align: center;
+        }
 
         .control-panel { 
             background: var(--panel-bg);
@@ -172,7 +185,6 @@
         #startup-title { font-family: 'Orbitron', sans-serif; font-size: clamp(2rem, 10vw, 3.5rem); text-transform: uppercase; color: var(--text-color); text-shadow: 0 0 8px var(--holo-cyan), 0 0 15px var(--holo-cyan); position: relative; opacity: 0; animation: flicker 4s 1.2s infinite, startup-fade-in 0.5s 1.2s forwards; }
         #startup-text { font-size: clamp(0.9rem, 3vw, 1.1rem); color: var(--text-muted); letter-spacing: 0.5px; margin: 0.5rem 0 2rem 0; opacity: 0; animation: startup-fade-in 1s 1.5s forwards; }
         
-        /* IMPROVED BUTTON STYLE */
         #connect-button {
             font-family: 'Orbitron', sans-serif;
             font-size: 1.25rem;
@@ -195,7 +207,6 @@
             box-shadow: 0 0 25px var(--holo-cyan), 0 0 10px var(--holo-cyan);
         }
         
-        /* DESKTOP & WIDE TABLET STYLES (>= 1024px) */
         @media (min-width: 1024px) {
             body {
                 justify-content: center;
@@ -282,6 +293,7 @@
                     <div class="reel" id="reel2"><div class="reel-icons"></div></div>
                     <div class="reel" id="reel3"><div class="reel-icons"></div></div>
                 </div>
+                <div id="current-spinner-address"></div>
                 <div id="result-message">Awaiting Signal...</div>
             </div>
             <div class="control-panel">
@@ -305,11 +317,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const REEL_SETS = 20;
     const SPIN_BASE_DURATION = 2000;
     
+    // --- UPDATED: Added reference to the new element ---
     const machineBody = document.getElementById('machine-body');
     const reelElements = [document.querySelector('#reel1'), document.querySelector('#reel2'), document.querySelector('#reel3')];
     const reelsContainer = document.getElementById('reels-container');
     const jackpotDisplay = document.getElementById('jackpot-display');
     const resultMessage = document.getElementById('result-message');
+    const spinnerAddressDisplay = document.getElementById('current-spinner-address'); // New element reference
     const pendingSpinsList = document.getElementById('pending-spins-list');
     const winnersList = document.getElementById('winners-list');
     const paytableList = document.getElementById('paytable-list');
@@ -380,6 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    // --- UPDATED: spin() function now displays the address ---
     function spin(outcome) {
         if (isAnimating || SYMBOLS.length === 0) {
             if(isAnimating) eventQueue.unshift({type: 'spin_outcome', payload: outcome});
@@ -395,6 +410,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         isAnimating = true;
+
+        // Display the spinner's full address
+        if (outcome.traderPublicKey) {
+            spinnerAddressDisplay.textContent = `Spinning for: ${outcome.traderPublicKey}`;
+            spinnerAddressDisplay.style.opacity = '1';
+        }
+
         playSound('spin-start');
         resultMessage.textContent = `Transmitting...`;
         resultMessage.className = '';
@@ -428,6 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }, SPIN_BASE_DURATION + 800);
     }
 
+    // --- UPDATED: showResult() function now clears the address display ---
     function showResult(outcome) {
         const { actualWinAmount, symbols } = outcome;
         if (actualWinAmount > 0) {
@@ -443,11 +466,27 @@ document.addEventListener('DOMContentLoaded', () => {
             playSound('lose');
         }
         
-        setTimeout(() => { if (!isAnimating) { resultMessage.textContent = "Awaiting Signal..."; resultMessage.className = ''; } }, 5000);
+        setTimeout(() => {
+            if (!isAnimating) {
+                resultMessage.textContent = "Awaiting Signal...";
+                resultMessage.className = '';
+                // Clear the spinner address display
+                spinnerAddressDisplay.textContent = '';
+                spinnerAddressDisplay.style.opacity = '0';
+            }
+        }, 5000);
     }
 
+    // --- UPDATED: showPayoutFailure() function now displays and clears the address ---
     function showPayoutFailure(payload) {
         isAnimating = true;
+
+        // Display the address of the user whose payout failed
+        if (payload.traderPublicKey) {
+            spinnerAddressDisplay.textContent = `Payout Failed for: ${payload.traderPublicKey}`;
+            spinnerAddressDisplay.style.opacity = '1';
+        }
+
         resultMessage.textContent = `WIN! PAYOUT FAILED`;
         resultMessage.className = 'payout-fail-text';
         playSound('error');
@@ -455,6 +494,11 @@ document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
             resultMessage.textContent = "Awaiting Signal...";
             resultMessage.className = '';
+            
+            // Clear the spinner address display
+            spinnerAddressDisplay.textContent = '';
+            spinnerAddressDisplay.style.opacity = '0';
+
             isAnimating = false;
             setTimeout(processNextEvent, 1000);
         }, 8000);
@@ -468,7 +512,9 @@ document.addEventListener('DOMContentLoaded', () => {
             icons.innerHTML = '';
             const frag = document.createDocumentFragment();
             for (let i = 0; i < REEL_SETS; i++) {
-                for (const sym of SYMBOLS) {
+                // Add skull to the visual reel strip along with other symbols
+                const allDisplaySymbols = [...SYMBOLS, { name: 'skull', class: 'fa-skull' }];
+                for (const sym of allDisplaySymbols) {
                     const icon = document.createElement('i');
                     icon.className = `fa-solid ${sym.class}`;
                     frag.appendChild(icon);
@@ -517,9 +563,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     case 'initial_state':
                         if (data.payload.symbols) { 
                             SYMBOLS = data.payload.symbols; 
-                            if (!SYMBOLS.find(s => s.name === 'skull')) {
-                                SYMBOLS.push({ name: 'skull', class: 'fa-skull', payout: 0 });
-                            }
                             populatePaytable(); 
                             populateReels(); 
                         }
