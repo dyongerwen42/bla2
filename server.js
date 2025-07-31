@@ -1,4 +1,4 @@
-// server.js (Fully Updated with Live Config API)
+// server.js (Fully Updated with Live Config API & Corrected Reel Logic)
 
 import express from 'express';
 import http from 'http';
@@ -57,6 +57,8 @@ const PAYOUT_PRIORITY_FEE_MICRO_LAMPORTS = process.env.PRIORITY_FEE || 50000;
 const WEBSOCKET_HEARTBEAT_INTERVAL_MS = 30000;
 const BLACKLIST_DURATION_MS = 1.5 * 60 * 60 * 1000;
 
+// ## FIXED: Unified SYMBOLS array ##
+// The skull is now included here, creating a single source of truth for all symbols.
 const SYMBOLS = [
     { name: 'lemon',   class: 'fa-lemon',   payout: 10 },
     { name: 'clover',  class: 'fa-clover',  payout: 20 },
@@ -64,10 +66,10 @@ const SYMBOLS = [
     { name: 'heart',   class: 'fa-heart',   payout: 40 },
     { name: 'star',    class: 'fa-star',    payout: 50 },
     { name: 'diamond', class: 'fa-diamond', payout: 75 },
-    { name: 'gem',     class: 'fa-gem',     payout: 100 }
+    { name: 'gem',     class: 'fa-gem',     payout: 100 },
+    { name: 'skull',   class: 'fa-skull',   payout: 0 }
 ];
 
-const skullSymbol = { name: 'skull', class: 'fa-skull', payout: 0 };
 const WEIGHTED_REEL = [];
 const weights = {
     'lemon': 32,
@@ -80,20 +82,21 @@ const weights = {
     'skull': 10
 };
 
+// ## FIXED: Simplified buildWeightedReel function ##
+// This function now correctly builds the reel from the single SYMBOLS array.
 function buildWeightedReel() {
-    WEIGHTED_REEL.length = 0;
-    
+    WEIGHTED_REEL.length = 0; // Clear the existing reel
+
+    // Loop through the single, unified SYMBOLS array
     SYMBOLS.forEach(symbol => {
-        const weight = weights[symbol.name] || 0;
+        // Get the weight for the current symbol from the weights object
+        const weight = weights[symbol.name] || 0; 
+        
+        // Add the symbol to the reel 'weight' number of times
         for (let i = 0; i < weight; i++) {
             WEIGHTED_REEL.push(symbol);
         }
     });
-
-    const skullWeight = weights['skull'] || 0;
-    for (let i = 0; i < skullWeight; i++) {
-        WEIGHTED_REEL.push(skullSymbol);
-    }
 }
 
 // =======================================================================
