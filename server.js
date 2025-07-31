@@ -1,4 +1,4 @@
-// server.js (Fully Updated with Persistence Fix & GET Settings API)
+// server.js (Final Corrected & Hardened Version)
 
 import express from 'express';
 import http from 'http';
@@ -26,7 +26,7 @@ import {
 
 dotenv.config();
 const app = express();
-app.use(express.json()); // Middleware to parse JSON bodies
+app.use(express.json());
 
 // =======================================================================
 // ## Configuration & Setup ##
@@ -38,7 +38,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
 
-// ## FIXED: Added weights.json for persistence ##
 const WEIGHTS_FILE = path.join(__dirname, 'weights.json');
 const WINNERS_FILE = path.join(__dirname, 'winners.json');
 const PENDING_SPINS_FILE = path.join(__dirname, 'pendingSpins.json');
@@ -71,27 +70,20 @@ const SYMBOLS = [
 ];
 
 const WEIGHTED_REEL = [];
-// Default weights, will be overwritten by weights.json if it exists
 const weights = {
-    'lemon': 32,
-    'clover': 25,
-    'bell': 18,
-    'heart': 9,
-    'star': 3,
-    'diamond': 2,
-    'gem': 1,
-    'skull': 10
+    'lemon': 32, 'clover': 25, 'bell': 18, 'heart': 9,
+    'star': 3, 'diamond': 2, 'gem': 1, 'skull': 10
 };
 
 function buildWeightedReel() {
-    WEIGHTED_REEL.length = 0; // Clear the existing reel
+    WEIGHTED_REEL.length = 0;
     SYMBOLS.forEach(symbol => {
-        const weight = weights[symbol.name] || 0; 
+        const weight = weights[symbol.name] || 0;
         for (let i = 0; i < weight; i++) {
             WEIGHTED_REEL.push(symbol);
         }
     });
-    console.log(` Reel rebuilt. Total items in reel: ${WEIGHTED_REEL.length}`);
+    console.log(`Reel rebuilt. Total items in reel: ${WEIGHTED_REEL.length}`);
 }
 
 // =======================================================================
@@ -106,13 +98,13 @@ function initializeWalletAndConnection() {
     try {
         if (!config.DEV_WALLET_KEY) throw new Error("DEV_WALLET_KEY not set.");
         devWallet = Keypair.fromSecretKey(bs58.decode(config.DEV_WALLET_KEY));
-        console.log(`✅ Dev Wallet loaded/reloaded. Public Key: ${devWallet.publicKey.toBase58()}`);
+        console.log(`✅ Dev Wallet loaded. Public Key: ${devWallet.publicKey.toBase58()}`);
     } catch (error) {
         console.error(`❌ FATAL: Could not load dev wallet. ${error.message}`);
         devWallet = null;
         return false;
     }
-    
+
     if (!process.env.RPC_URL) {
         console.error("❌ FATAL: RPC_URL not set in .env file.");
         process.exit(1);
@@ -213,44 +205,36 @@ function calculateWin(resultSymbols, betAmount) {
 
     if (s1.name === s2.name && s2.name === s3.name) {
         payoutPercent = s1.payout;
-    } else if (s1.name === s2.name && twoOfAKindWinners.includes(s1.name)) { 
+    } else if (s1.name === s2.name && twoOfAKindWinners.includes(s1.name)) {
         payoutPercent = s1.payout * 0.20;
     }
 
     return payoutPercent > 0 ? Math.max(1, Math.round(betAmount * (payoutPercent / 100))) : 0;
 }
 
+// ## FIXED: Robust function to handle zero-weight skulls ##
 function generateLosingCombination() {
-    // If the reel has become unlosable (e.g., all winning symbols), return a default losing combo
-    if (WEIGHTED_REEL.every(symbol => symbol.name !== 'skull' && calculateWin([symbol, symbol, symbol], 100) > 0)) {
-         const lemon = SYMBOLS.find(s => s.name === 'lemon');
-         const clover = SYMBOLS.find(s => s.name === 'clover');
-         const bell = SYMBOLS.find(s => s.name === 'bell');
-         return [lemon, clover, bell]; // Guaranteed loss
-    }
+    console.log("Forcing a loss. Deterministically generating a losing combination...");
+    const payingSymbols = SYMBOLS.filter(s => s.name !== 'skull');
 
-    let symbols, winAmount;
-    let attempts = 0;
-    do {
-        symbols = [
-            WEIGHTED_REEL[Math.floor(Math.random() * WEIGHTED_REEL.length)],
-            WEIGHTED_REEL[Math.floor(Math.random() * WEIGHTED_REEL.length)],
-            WEIGHTED_REEL[Math.floor(Math.random() * WEIGHTED_REEL.length)]
+    if (payingSymbols.length < 3) {
+        return [
+            SYMBOLS.find(s => s.name === 'lemon') || SYMBOLS[0],
+            SYMBOLS.find(s => s.name === 'clover') || SYMBOLS[1] || SYMBOLS[0],
+            SYMBOLS.find(s => s.name === 'bell') || SYMBOLS[2] || SYMBOLS[1] || SYMBOLS[0]
         ];
-        winAmount = calculateWin(symbols, 100);
-        attempts++;
-        // Safety break to prevent infinite loops if the reel is all winners
-        if (attempts > 100) {
-             const lemon = SYMBOLS.find(s => s.name === 'lemon');
-             const clover = SYMBOLS.find(s => s.name === 'clover');
-             const bell = SYMBOLS.find(s => s.name === 'bell');
-             return [lemon, clover, bell]; // Guaranteed loss
-        }
-    } while (winAmount > 0);
-    return symbols;
+    }
+    return [payingSymbols[0], payingSymbols[1], payingSymbols[2]];
 }
 
 async function executeSpin(traderPublicKeyStr, betAmount) {
+    // ## CRITICAL BUG FIX: Prevent crash if all weights are 0 ##
+    if (WEIGHTED_REEL.length === 0) {
+        console.error("🚨 CRITICAL ERROR: WEIGHTED_REEL is empty. Cannot perform spin. Check symbol weights. Forcing loss.");
+        broadcast({ type: 'spin_outcome', payload: { symbols: generateLosingCombination().map(s=>s.name), actualWinAmount: 0, traderPublicKey: traderPublicKeyStr } });
+        return;
+    }
+
     if (forcedWinnerAddress && traderPublicKeyStr === forcedWinnerAddress) {
         console.log(`✨ Executing FORCED WIN for ${traderPublicKeyStr}`);
         forcedWinnerAddress = null;
@@ -418,9 +402,9 @@ function connectToPumpPortal() {
         console.log('🔌 Closing existing pump.fun connection...');
         pumpWs.close();
     }
-    if (!config.TOKEN_MINT_TO_WATCH) { 
-        console.warn("⚠️ WARNING: TOKEN_MINT_TO_WATCH is not set. Cannot connect to pump.fun."); 
-        return; 
+    if (!config.TOKEN_MINT_TO_WATCH) {
+        console.warn("⚠️ WARNING: TOKEN_MINT_TO_WATCH is not set. Cannot connect to pump.fun.");
+        return;
     }
     console.log(`📡 Connecting to PumpPortal to watch: ${config.TOKEN_MINT_TO_WATCH}`);
     pumpWs = new WebSocket('wss://pumpportal.fun/api/data');
@@ -429,11 +413,11 @@ function connectToPumpPortal() {
         pumpWs.send(JSON.stringify({ method: "subscribeTokenTrade", keys: [config.TOKEN_MINT_TO_WATCH] }));
     });
     pumpWs.on('message', (event) => { try { handleTradeData(JSON.parse(event.toString())); } catch (e) { console.error("Error processing pump.fun message", e); } });
-    pumpWs.on('close', () => { 
-        if (!isShuttingDown) { 
-            console.log('PumpPortal connection closed. Reconnecting in 5s...'); 
-            setTimeout(connectToPumpPortal, 5000); 
-        } 
+    pumpWs.on('close', () => {
+        if (!isShuttingDown) {
+            console.log('PumpPortal connection closed. Reconnecting in 5s...');
+            setTimeout(connectToPumpPortal, 5000);
+        }
     });
     pumpWs.on('error', (err) => { console.error('PumpPortal WebSocket error:', err.message); pumpWs.close(); });
 }
@@ -469,7 +453,6 @@ const heartbeatInterval = setInterval(() => {
 // ## State Persistence, Startup & Shutdown ##
 // =======================================================================
 
-// ## FIXED: saveState now saves weights ##
 function saveState() {
     try { fs.writeFileSync(WEIGHTS_FILE, JSON.stringify(weights, null, 2)); } catch (e) { console.error("Error saving weights:", e); }
     try { fs.writeFileSync(WINNERS_FILE, JSON.stringify(recentWinners, null, 2)); } catch (e) { console.error("Error saving winners:", e); }
@@ -488,17 +471,14 @@ function saveState() {
     } catch (e) { console.error("Error saving trader history:", e); }
 }
 
-// ## FIXED: loadState now loads weights ##
 function loadState() {
     try {
         if (fs.existsSync(WEIGHTS_FILE)) {
             const loadedWeights = JSON.parse(fs.readFileSync(WEIGHTS_FILE, 'utf-8'));
-            Object.assign(weights, loadedWeights); // Overwrite defaults with saved weights
+            Object.assign(weights, loadedWeights);
             console.log(`✅ Custom weights loaded from file.`);
         }
-    } catch (e) {
-        console.error("Error loading weights:", e);
-    }
+    } catch (e) { console.error("Error loading weights:", e); }
     try { if (fs.existsSync(WINNERS_FILE)) { recentWinners = JSON.parse(fs.readFileSync(WINNERS_FILE, 'utf-8')); totalPayout = recentWinners.reduce((sum, w) => sum + w.amount, 0); console.log(`✅ ${recentWinners.length} winners loaded.`); } } catch (e) { console.error("Error loading winners:", e); }
     try { if (fs.existsSync(PROCESSED_SIGS_FILE)) { const sigs = JSON.parse(fs.readFileSync(PROCESSED_SIGS_FILE, 'utf-8')); processedSignatures = new Set(sigs); console.log(`✅ ${processedSignatures.size} processed signatures loaded.`); } } catch (e) { console.error("Error loading signatures:", e); }
     try {
@@ -565,36 +545,30 @@ let jackpotInterval;
 // ## Admin API Endpoints ##
 // =======================================================================
 
-// ## NEW: GET endpoint to view current settings ##
 app.get('/api/get-settings', (req, res) => {
     const apiKey = req.headers['x-api-key'];
     if (!apiKey || apiKey !== process.env.API_SECRET_KEY) {
         return res.status(403).send('Forbidden: Invalid API Key');
     }
 
-    // Create a safe version of the config to send, without the private key
     const safeConfig = { ...config };
     delete safeConfig.DEV_WALLET_KEY;
     if(devWallet) {
         safeConfig.DEV_WALLET_PUBLIC_KEY = devWallet.publicKey.toBase58();
     }
 
-    const settings = {
+    res.status(200).json({
         config: safeConfig,
         weights: weights,
         gameStatus: {
-            currentJackpot: currentJackpot,
-            totalPayout: totalPayout,
+            currentJackpot, totalPayout,
             pendingSpinsCount: pendingSpins.size,
             blacklistedCount: blacklist.size,
             forcedWinnerAddress: forcedWinnerAddress || 'None'
         }
-    };
-
-    res.status(200).json(settings);
+    });
 });
 
-// ## FIXED: Now calls saveState() to persist changes ##
 app.post('/api/update-weights', (req, res) => {
     const apiKey = req.headers['x-api-key'];
     if (!apiKey || apiKey !== process.env.API_SECRET_KEY) {
@@ -602,23 +576,20 @@ app.post('/api/update-weights', (req, res) => {
     }
 
     const newWeights = req.body;
-    
     const requiredKeys = ['lemon', 'clover', 'bell', 'heart', 'star', 'diamond', 'gem', 'skull'];
     if (!requiredKeys.every(key => newWeights.hasOwnProperty(key) && typeof newWeights[key] === 'number')) {
         return res.status(400).send('Bad Request: Invalid or missing symbol weights.');
     }
 
-    const totalWeight = Object.values(newWeights).reduce((sum, val) => sum + val, 0);
-    if (totalWeight !== 100) {
-        return res.status(400).send('Bad Request: Total weight of all symbols must be exactly 100.');
+    if (Object.values(newWeights).reduce((s, v) => s + v, 0) !== 100) {
+        return res.status(400).send('Bad Request: Total weight must be 100.');
     }
 
     Object.assign(weights, newWeights);
     buildWeightedReel();
-    saveState(); // Persist the new weights to disk
-    
+    saveState();
     console.log('✅ Weights updated and saved via API:', weights);
-    res.status(200).json({ message: 'Weights updated and saved successfully', newWeights });
+    res.status(200).json({ message: 'Weights updated successfully', newWeights });
 });
 
 app.post('/api/force-win', (req, res) => {
@@ -626,12 +597,10 @@ app.post('/api/force-win', (req, res) => {
     if (!apiKey || apiKey !== process.env.API_SECRET_KEY) {
         return res.status(403).send('Forbidden: Invalid API Key');
     }
-
     const { traderPublicKey } = req.body;
     if (!traderPublicKey || typeof traderPublicKey !== 'string') {
         return res.status(400).send('Bad Request: traderPublicKey is required.');
     }
-
     forcedWinnerAddress = traderPublicKey;
     console.log(`✨ Forced win set for address: ${traderPublicKey}`);
     res.status(200).json({ message: `Forced win set for ${traderPublicKey}` });
@@ -642,51 +611,45 @@ app.post('/api/update-config', (req, res) => {
     if (!apiKey || apiKey !== process.env.API_SECRET_KEY) {
         return res.status(403).send('Forbidden: Invalid API Key');
     }
-
     const { devWalletKey, jackpotWallet, tokenToPay, tokenToWatch } = req.body;
     let changes = [];
     let needsReconnect = false;
 
     if (devWalletKey && devWalletKey !== config.DEV_WALLET_KEY) {
         try {
-            const newWallet = Keypair.fromSecretKey(bs58.decode(devWalletKey));
-            devWallet = newWallet;
+            devWallet = Keypair.fromSecretKey(bs58.decode(devWalletKey));
             config.DEV_WALLET_KEY = devWalletKey;
             changes.push(`Dev Wallet updated to: ${devWallet.publicKey.toBase58()}`);
         } catch (e) {
             return res.status(400).send(`Bad Request: Invalid devWalletKey: ${e.message}`);
         }
     }
-
     if (jackpotWallet) { config.JACKPOT_WALLET_ADDRESS = jackpotWallet; changes.push('Jackpot Wallet updated.'); }
     if (tokenToPay) { config.TOKEN_MINT_TO_PAY_WITH = tokenToPay; changes.push('Token to Pay With updated.'); }
-    
     if (tokenToWatch && tokenToWatch !== config.TOKEN_MINT_TO_WATCH) {
         config.TOKEN_MINT_TO_WATCH = tokenToWatch;
         changes.push('Token to Watch updated.');
         needsReconnect = true;
     }
+    if (needsReconnect) connectToPumpPortal();
 
-    if (needsReconnect) {
-        connectToPumpPortal();
-    }
-
-    // Note: These config changes are not persisted and will be lost on restart
     console.log('✅ Config updated via API:', changes.join(' '));
     res.status(200).json({ message: 'Configuration updated successfully.', changes });
 });
 
+// =======================================================================
+// ## Startup & Shutdown ##
+// =======================================================================
 
 async function startup() {
     console.log('Server starting up...');
     app.use(express.static(path.join(__dirname, 'public')));
     
-    // ## FIXED: Load state first, then build the reel ##
     loadState();
     buildWeightedReel();
     
     if (!initializeWalletAndConnection()) {
-        console.error("🚨 CRITICAL: Could not initialize wallet on startup. Some features may fail.");
+        console.error("🚨 CRITICAL: Could not initialize wallet on startup.");
     }
     
     await getJackpotBalance();
@@ -702,6 +665,7 @@ function gracefulShutdown(signal) {
 
     clearInterval(heartbeatInterval);
     clearInterval(jackpotInterval);
+    if (pumpWs) pumpWs.close();
     server.close(() => console.log("HTTP server closed."));
     wss.clients.forEach(client => client.terminate());
 
@@ -713,12 +677,13 @@ function gracefulShutdown(signal) {
     saveState();
 
     const shutdownInterval = setInterval(() => {
-        if (spinQueue.length === 0) {
+        // ## FIXED: More robust check for active tasks ##
+        if (spinQueue.queue.length === 0 && !spinQueue.isProcessing) {
             clearInterval(shutdownInterval);
             console.log("✅ All queued tasks completed. Exiting now.");
             process.exit(0);
         }
-        console.log(`Waiting for ${spinQueue.length} task(s) to complete...`);
+        console.log(`Waiting for ${spinQueue.queue.length + (spinQueue.isProcessing ? 1 : 0)} task(s) to complete...`);
     }, 500);
 
     setTimeout(() => {
