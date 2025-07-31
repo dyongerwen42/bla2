@@ -1,4 +1,4 @@
-// server.js (Fully Updated with Live Config API & Corrected Reel Logic)
+// server.js (Fully Updated with Persistence Fix & GET Settings API)
 
 import express from 'express';
 import http from 'http';
@@ -38,6 +38,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
 
+// ## FIXED: Added weights.json for persistence ##
+const WEIGHTS_FILE = path.join(__dirname, 'weights.json');
 const WINNERS_FILE = path.join(__dirname, 'winners.json');
 const PENDING_SPINS_FILE = path.join(__dirname, 'pendingSpins.json');
 const PROCESSED_SIGS_FILE = path.join(__dirname, 'processedSigs.json');
@@ -57,8 +59,6 @@ const PAYOUT_PRIORITY_FEE_MICRO_LAMPORTS = process.env.PRIORITY_FEE || 50000;
 const WEBSOCKET_HEARTBEAT_INTERVAL_MS = 30000;
 const BLACKLIST_DURATION_MS = 1.5 * 60 * 60 * 1000;
 
-// ## FIXED: Unified SYMBOLS array ##
-// The skull is now included here, creating a single source of truth for all symbols.
 const SYMBOLS = [
     { name: 'lemon',   class: 'fa-lemon',   payout: 10 },
     { name: 'clover',  class: 'fa-clover',  payout: 20 },
@@ -71,6 +71,7 @@ const SYMBOLS = [
 ];
 
 const WEIGHTED_REEL = [];
+// Default weights, will be overwritten by weights.json if it exists
 const weights = {
     'lemon': 32,
     'clover': 25,
@@ -82,21 +83,15 @@ const weights = {
     'skull': 10
 };
 
-// ## FIXED: Simplified buildWeightedReel function ##
-// This function now correctly builds the reel from the single SYMBOLS array.
 function buildWeightedReel() {
     WEIGHTED_REEL.length = 0; // Clear the existing reel
-
-    // Loop through the single, unified SYMBOLS array
     SYMBOLS.forEach(symbol => {
-        // Get the weight for the current symbol from the weights object
         const weight = weights[symbol.name] || 0; 
-        
-        // Add the symbol to the reel 'weight' number of times
         for (let i = 0; i < weight; i++) {
             WEIGHTED_REEL.push(symbol);
         }
     });
+    console.log(` Reel rebuilt. Total items in reel: ${WEIGHTED_REEL.length}`);
 }
 
 // =======================================================================
@@ -226,7 +221,16 @@ function calculateWin(resultSymbols, betAmount) {
 }
 
 function generateLosingCombination() {
+    // If the reel has become unlosable (e.g., all winning symbols), return a default losing combo
+    if (WEIGHTED_REEL.every(symbol => symbol.name !== 'skull' && calculateWin([symbol, symbol, symbol], 100) > 0)) {
+         const lemon = SYMBOLS.find(s => s.name === 'lemon');
+         const clover = SYMBOLS.find(s => s.name === 'clover');
+         const bell = SYMBOLS.find(s => s.name === 'bell');
+         return [lemon, clover, bell]; // Guaranteed loss
+    }
+
     let symbols, winAmount;
+    let attempts = 0;
     do {
         symbols = [
             WEIGHTED_REEL[Math.floor(Math.random() * WEIGHTED_REEL.length)],
@@ -234,6 +238,14 @@ function generateLosingCombination() {
             WEIGHTED_REEL[Math.floor(Math.random() * WEIGHTED_REEL.length)]
         ];
         winAmount = calculateWin(symbols, 100);
+        attempts++;
+        // Safety break to prevent infinite loops if the reel is all winners
+        if (attempts > 100) {
+             const lemon = SYMBOLS.find(s => s.name === 'lemon');
+             const clover = SYMBOLS.find(s => s.name === 'clover');
+             const bell = SYMBOLS.find(s => s.name === 'bell');
+             return [lemon, clover, bell]; // Guaranteed loss
+        }
     } while (winAmount > 0);
     return symbols;
 }
@@ -457,7 +469,9 @@ const heartbeatInterval = setInterval(() => {
 // ## State Persistence, Startup & Shutdown ##
 // =======================================================================
 
+// ## FIXED: saveState now saves weights ##
 function saveState() {
+    try { fs.writeFileSync(WEIGHTS_FILE, JSON.stringify(weights, null, 2)); } catch (e) { console.error("Error saving weights:", e); }
     try { fs.writeFileSync(WINNERS_FILE, JSON.stringify(recentWinners, null, 2)); } catch (e) { console.error("Error saving winners:", e); }
     try {
         const serializableSpins = Array.from(pendingSpins.entries()).map(([key, value]) => { const { timerId, ...rest } = value; return [key, rest]; });
@@ -474,7 +488,17 @@ function saveState() {
     } catch (e) { console.error("Error saving trader history:", e); }
 }
 
+// ## FIXED: loadState now loads weights ##
 function loadState() {
+    try {
+        if (fs.existsSync(WEIGHTS_FILE)) {
+            const loadedWeights = JSON.parse(fs.readFileSync(WEIGHTS_FILE, 'utf-8'));
+            Object.assign(weights, loadedWeights); // Overwrite defaults with saved weights
+            console.log(`✅ Custom weights loaded from file.`);
+        }
+    } catch (e) {
+        console.error("Error loading weights:", e);
+    }
     try { if (fs.existsSync(WINNERS_FILE)) { recentWinners = JSON.parse(fs.readFileSync(WINNERS_FILE, 'utf-8')); totalPayout = recentWinners.reduce((sum, w) => sum + w.amount, 0); console.log(`✅ ${recentWinners.length} winners loaded.`); } } catch (e) { console.error("Error loading winners:", e); }
     try { if (fs.existsSync(PROCESSED_SIGS_FILE)) { const sigs = JSON.parse(fs.readFileSync(PROCESSED_SIGS_FILE, 'utf-8')); processedSignatures = new Set(sigs); console.log(`✅ ${processedSignatures.size} processed signatures loaded.`); } } catch (e) { console.error("Error loading signatures:", e); }
     try {
@@ -541,6 +565,36 @@ let jackpotInterval;
 // ## Admin API Endpoints ##
 // =======================================================================
 
+// ## NEW: GET endpoint to view current settings ##
+app.get('/api/get-settings', (req, res) => {
+    const apiKey = req.headers['x-api-key'];
+    if (!apiKey || apiKey !== process.env.API_SECRET_KEY) {
+        return res.status(403).send('Forbidden: Invalid API Key');
+    }
+
+    // Create a safe version of the config to send, without the private key
+    const safeConfig = { ...config };
+    delete safeConfig.DEV_WALLET_KEY;
+    if(devWallet) {
+        safeConfig.DEV_WALLET_PUBLIC_KEY = devWallet.publicKey.toBase58();
+    }
+
+    const settings = {
+        config: safeConfig,
+        weights: weights,
+        gameStatus: {
+            currentJackpot: currentJackpot,
+            totalPayout: totalPayout,
+            pendingSpinsCount: pendingSpins.size,
+            blacklistedCount: blacklist.size,
+            forcedWinnerAddress: forcedWinnerAddress || 'None'
+        }
+    };
+
+    res.status(200).json(settings);
+});
+
+// ## FIXED: Now calls saveState() to persist changes ##
 app.post('/api/update-weights', (req, res) => {
     const apiKey = req.headers['x-api-key'];
     if (!apiKey || apiKey !== process.env.API_SECRET_KEY) {
@@ -561,9 +615,10 @@ app.post('/api/update-weights', (req, res) => {
 
     Object.assign(weights, newWeights);
     buildWeightedReel();
+    saveState(); // Persist the new weights to disk
     
-    console.log('✅ Weights updated via API:', weights);
-    res.status(200).json({ message: 'Weights updated successfully', newWeights });
+    console.log('✅ Weights updated and saved via API:', weights);
+    res.status(200).json({ message: 'Weights updated and saved successfully', newWeights });
 });
 
 app.post('/api/force-win', (req, res) => {
@@ -616,6 +671,7 @@ app.post('/api/update-config', (req, res) => {
         connectToPumpPortal();
     }
 
+    // Note: These config changes are not persisted and will be lost on restart
     console.log('✅ Config updated via API:', changes.join(' '));
     res.status(200).json({ message: 'Configuration updated successfully.', changes });
 });
@@ -625,8 +681,9 @@ async function startup() {
     console.log('Server starting up...');
     app.use(express.static(path.join(__dirname, 'public')));
     
-    buildWeightedReel();
+    // ## FIXED: Load state first, then build the reel ##
     loadState();
+    buildWeightedReel();
     
     if (!initializeWalletAndConnection()) {
         console.error("🚨 CRITICAL: Could not initialize wallet on startup. Some features may fail.");
