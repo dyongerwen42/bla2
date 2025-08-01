@@ -6,7 +6,6 @@
     <title>PUMP SLOTS</title>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -27,6 +26,7 @@
             --machine-border: #334155;
             --screen-bg: rgba(10, 20, 30, 0.85);
             --panel-bg: rgba(15, 23, 36, 0.7);
+            --panel-bg-light: rgba(22, 33, 49, 0.5);
         }
         @keyframes flicker { 50% { opacity: 0.85; text-shadow: 0 0 12px var(--holo-cyan), 0 0 22px var(--holo-cyan); } }
         @keyframes text-shine { to { background-position: -200% center; } }
@@ -36,18 +36,21 @@
         @keyframes connect-pulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 15px -4px var(--holo-cyan); } 50% { transform: scale(1.02); box-shadow: 0 0 25px -4px var(--holo-cyan); } }
         @keyframes reel-glitch { 0%, 100% { transform: skewX(0); } 20% { transform: skewX(2deg); } 40% { transform: skewX(-2deg); } 60% { transform: skewX(1deg); } 80% { transform: skewX(-1deg); } }
         @keyframes startup-fade-in { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* --- BASE & MOBILE-FIRST STYLES --- */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
         html { scroll-behavior: smooth; }
         body {
             font-family: 'Roboto Mono', monospace;
             background-color: var(--bg-color);
             color: var(--text-color);
             display: flex;
-            justify-content: flex-start;
             align-items: center;
             flex-direction: column;
             min-height: 100vh;
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
             padding: 1rem;
             background-image:
                 radial-gradient(ellipse at center, rgba(148, 34, 255, 0.1), transparent 60%),
@@ -57,76 +60,59 @@
             animation: background-pan 30s linear infinite;
         }
         #particle-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; opacity: 0.5; }
-        .machine-container { width: 100%; max-width: 1200px; z-index: 1; }
-        .machine-body {
-            transform-style: preserve-3d;
-            position: relative;
+        
+        .console-container {
+            width: 100%;
+            max-width: 500px; /* Max width for mobile */
+            z-index: 1;
             opacity: 0;
             animation: power-on 1.5s 0.5s ease-out forwards;
-            transition: box-shadow 0.5s ease;
-            display: grid;
-            width: 100%;
-            gap: 1.5rem;
-            grid-template-areas: "main" "payouts" "pending";
         }
-        .main-console { grid-area: main; background: none; border: none; padding: 0; box-shadow: none; backdrop-filter: none; }
-        .side-panel {
-            background: var(--panel-bg);
-            border: 1px solid var(--machine-border);
-            border-radius: 15px;
-            padding: 1rem;
-            backdrop-filter: blur(8px);
-            box-shadow: inset 0 0 15px rgba(0,0,0,0.5);
-            transform-style: preserve-3d;
-        }
-        .pending-panel { grid-area: pending; }
-        .payouts-panel { grid-area: payouts; }
+
+        .top-section, .bottom-section-panels { width: 100%; }
+        .bottom-section-panels { display: grid; gap: 1.5rem; margin-top: 1.5rem; }
+
         .main-screen {
             border: 2px solid var(--holo-cyan);
             box-shadow: 0 0 25px -5px var(--holo-cyan), inset 0 0 15px rgba(0,0,0,0.5);
             position: relative;
             overflow: hidden;
             border-radius: 20px;
-            padding: 1.5rem;
+            padding: 1.5rem 1rem;
             background: var(--screen-bg);
-            margin-bottom: 1.5rem;
         }
         .main-screen::after { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%); background-size: 100% 3px; pointer-events: none; animation: scanlines 20s linear infinite; }
+        
         .machine-header { text-align: center; margin-bottom: 1rem; }
-        .machine-header h1 { font-family: 'Orbitron', sans-serif; font-size: clamp(1.8rem, 5vw, 2.5rem); text-transform: uppercase; background: linear-gradient(90deg, var(--holo-cyan), #fff, var(--holo-magenta), var(--holo-cyan)); background-size: 200% auto; color: #000; background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: text-shine 5s linear infinite reverse, flicker 4s infinite; }
-        #jackpot-display { font-size: clamp(2rem, 5vw, 3rem); color: var(--holo-gold); text-shadow: 0 0 10px var(--holo-gold), 0 0 25px var(--holo-gold); transition: color 0.3s, opacity 0.3s; }
+        .machine-header h1 { font-family: 'Orbitron', sans-serif; font-size: clamp(1.8rem, 7vw, 2.5rem); text-transform: uppercase; background: linear-gradient(90deg, var(--holo-cyan), #fff, var(--holo-magenta), var(--holo-cyan)); background-size: 200% auto; color: #000; background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: text-shine 5s linear infinite reverse, flicker 4s infinite; }
+        #jackpot-display { font-size: clamp(2rem, 8vw, 3rem); color: var(--holo-gold); text-shadow: 0 0 10px var(--holo-gold), 0 0 25px var(--holo-gold); transition: color 0.3s, opacity 0.3s; }
         #jackpot-display.stale { color: var(--text-muted); opacity: 0.7; }
+
         .reels-container { display: flex; gap: 1rem; justify-content: center; padding: 1rem 0; }
-        .reel { width: clamp(80px, 18vw, 140px); height: clamp(80px, 18vw, 140px); background: linear-gradient(180deg, rgba(0,0,0,0.4), rgba(0,0,0,0.2)); border-radius: 20px; overflow: hidden; position: relative; border: 2px solid var(--machine-border); box-shadow: inset 0 5px 15px rgba(0,0,0,0.5), 0 2px 5px rgba(0,0,0,0.3); transition: border-color 0.3s, box-shadow 0.3s; }
+        .reel { width: clamp(80px, 22vw, 140px); height: clamp(80px, 22vw, 140px); background: linear-gradient(180deg, rgba(0,0,0,0.4), rgba(0,0,0,0.2)); border-radius: 20px; overflow: hidden; position: relative; border: 2px solid var(--machine-border); box-shadow: inset 0 5px 15px rgba(0,0,0,0.5), 0 2px 5px rgba(0,0,0,0.3); }
         .reel.win-highlight { border-color: var(--win-color); box-shadow: 0 0 20px var(--win-color); animation: reel-glitch 0.3s 2; }
         .reel-icons { position: absolute; top: 0; left: 0; width: 100%; transition: top 2s cubic-bezier(.32,1.5,.55,1.2), filter 0.3s ease; }
-        .reel-icons i { font-size: clamp(45px, 10vw, 80px); line-height: clamp(80px, 18vw, 140px); text-align: center; width: 100%; display: block; text-shadow: 0 0 8px currentColor, 0 0 20px currentColor, 0 0 30px #fff; transition: transform 0.2s; }
+        .reel-icons i { text-align: center; width: 100%; display: block; text-shadow: 0 0 8px currentColor, 0 0 20px currentColor, 0 0 30px #fff; }
+        
         .fa-gem { color: #d755ff; } .fa-diamond { color: #00f6ff; } .fa-star { color: #ffc800; } .fa-heart { color: #ff2a6d; } .fa-bell { color: #ff9a00; } .fa-clover { color: #00ff6a; } .fa-lemon { color: #f8ff38; } .fa-skull { color: #6c757d; }
-        #current-spinner-address {
-            font-size: clamp(0.75rem, 2.5vw, 0.9rem);
-            color: var(--text-muted);
-            text-shadow: 0 0 5px rgba(0, 229, 255, 0.5);
-            margin-top: 1rem;
-            min-height: 20px;
-            opacity: 0;
-            transition: opacity 0.5s ease;
-            word-break: break-all;
-            text-align: center;
-        }
-        .control-panel { background: var(--panel-bg); border: 1px solid var(--machine-border); border-radius: 15px; padding: 1rem; backdrop-filter: blur(8px); box-shadow: inset 0 0 15px rgba(0,0,0,0.5); }
-        #result-message { font-size: clamp(1rem, 4vw, 1.4rem); text-transform: uppercase; min-height: 30px; transition: all 0.3s; letter-spacing: 1px; }
+        
+        #current-spinner-address { font-size: clamp(0.75rem, 2.5vw, 0.9rem); color: var(--text-muted); text-shadow: 0 0 5px rgba(0, 229, 255, 0.5); margin-top: 1rem; min-height: 20px; opacity: 0; transition: opacity 0.5s ease; word-break: break-all; text-align: center; }
+        #result-message { font-size: clamp(1rem, 4vw, 1.4rem); text-transform: uppercase; min-height: 30px; transition: all 0.3s; letter-spacing: 1px; text-align: center; }
         .win-text { color: var(--win-color); text-shadow: 0 0 12px var(--win-color); transform: scale(1.05); }
         .lose-text { color: var(--lose-color); text-shadow: 0 0 12px var(--lose-color); }
         .payout-fail-text { color: var(--holo-gold); text-shadow: 0 0 12px var(--holo-gold); }
-        .side-panel h3 { text-align: center; color: var(--holo-cyan); margin-bottom: 1rem; text-transform: uppercase; font-size: 1.1rem; letter-spacing: 1px; border-bottom: 1px solid var(--machine-border); padding-bottom: 0.5rem; }
-        .side-panel ul { list-style: none; max-height: 200px; overflow-y: auto; padding-right: 0.5rem; }
-        .side-panel li { background: rgba(0,0,0,0.2); padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid var(--machine-border); transition: all 0.2s; font-size: 0.9rem; }
-        #paytable-list { max-height: none; overflow-y: visible; display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
-        .paytable-item { display: grid; grid-template-columns: 40px 1fr; gap: 1rem; align-items: center; background: rgba(0,0,0,0.2); padding: 0.5rem; border-radius: 5px; border: 1px solid var(--machine-border); border-left: 3px solid var(--holo-purple); }
-        .rules-header { margin-top: 1.5rem; font-size: 1rem; color: var(--holo-cyan); border-bottom: 1px solid var(--machine-border); padding-bottom: 0.5rem; }
-        .rules-list { list-style: none; padding: 0; margin-top: 1rem; font-size: 0.85rem; }
-        .rules-list li { background: none; padding: 0.4rem 0.5rem; margin-bottom: 0.25rem; border-left: 3px solid var(--holo-magenta); display: flex; align-items: center; text-align: left; max-width: 380px; margin-left: auto; margin-right: auto; }
-        .rule-icon { margin-right: 0.75rem; color: var(--holo-cyan); width: 20px; text-align: center; }
+
+        .info-panel { background: var(--panel-bg); border: 1px solid var(--machine-border); border-radius: 15px; padding: 1rem; backdrop-filter: blur(8px); }
+        .info-panel h3 { text-align: center; color: var(--holo-cyan); margin-bottom: 1rem; text-transform: uppercase; font-size: 1.1rem; letter-spacing: 1px; border-bottom: 1px solid var(--machine-border); padding-bottom: 0.5rem; }
+        .info-panel ul { list-style: none; padding: 0; }
+        .info-panel li { background: rgba(0,0,0,0.2); padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid var(--machine-border); font-size: 0.9rem; }
+        
+        #paytable-list .paytable-item { display: grid; grid-template-columns: 30px 1fr; gap: 1rem; align-items: center; border-left-color: var(--holo-purple); }
+        .rules-list li { display: flex; align-items: flex-start; text-align: left; background: none; border-left-color: var(--holo-magenta); justify-content: flex-start; padding: 0.4rem 0.2rem; }
+        .rule-icon { margin-right: 0.75rem; color: var(--holo-cyan); width: 20px; text-align: center; margin-top: 2px; flex-shrink: 0; }
+        .paytable-main-icon { text-align: center; }
+
+        /* --- STARTUP OVERLAY --- */
         #audio-unlock-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(1, 4, 10, 0.95); backdrop-filter: blur(10px); display: flex; justify-content: center; align-items: center; z-index: 100; padding: 1rem; opacity: 1; transition: opacity 0.5s ease-out; }
         .startup-box { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; width: 100%; max-width: 500px; padding: 2.5rem 2rem; background: linear-gradient(145deg, rgba(15, 23, 36, 0.5), rgba(12, 16, 22, 0.5)); border: 1px solid var(--machine-border); box-shadow: 0 0 40px rgba(0,0,0,0.5), inset 0 0 30px rgba(0,0,0,0.4); animation: startup-fade-in 1s ease-out; overflow: hidden; }
         #startup-logo { max-width: 220px; width: 70%; margin-bottom: 1.5rem; opacity: 0; animation: startup-fade-in 1.2s 0.8s forwards; }
@@ -134,43 +120,100 @@
         #startup-text { font-size: clamp(0.9rem, 3vw, 1.1rem); color: var(--text-muted); letter-spacing: 0.5px; margin: 0.5rem 0 2rem 0; opacity: 0; animation: startup-fade-in 1s 1.5s forwards; }
         #connect-button { font-family: 'Orbitron', sans-serif; font-size: 1.25rem; color: var(--text-color); background: rgba(0, 229, 255, 0.1); border: 2px solid var(--holo-cyan); padding: 15px 35px; border-radius: 5px; cursor: pointer; text-transform: uppercase; letter-spacing: 2px; transition: all 0.3s ease; opacity: 0; box-shadow: 0 0 15px -4px var(--holo-cyan); animation: connect-pulse 2.5s 1.8s infinite, startup-fade-in 1s 1.8s forwards; }
         #connect-button:hover { background: var(--holo-cyan); color: var(--bg-color); box-shadow: 0 0 25px var(--holo-cyan), 0 0 10px var(--holo-cyan); }
+        
+
+        /* =================================================================== */
+        /* === DEFINITIVE WIDESCREEN DESKTOP LAYOUT (min-width: 1024px) ====== */
+        /* =================================================================== */
         @media (min-width: 1024px) {
-            body { justify-content: center; }
-            .machine-container { perspective: 2500px; }
-            .machine-body { background: radial-gradient(circle at 50% 0%, #2a3447, transparent 70%), var(--machine-bg); border: 1px solid var(--machine-border); border-radius: 30px; padding: 2rem; box-shadow: 0 25px 70px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.05), inset 0 0 50px rgba(0,0,0,0.8); grid-template-columns: 280px 1fr 280px; grid-template-areas: "pending main payouts"; align-items: start; transform: rotateX(10deg); }
-            .machine-body.win-state { box-shadow: 0 0 50px var(--win-color), 0 25px 70px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.05); }
-            .main-console { background: var(--panel-bg); border: 1px solid var(--machine-border); border-radius: 15px; padding: 1rem; backdrop-filter: blur(8px); box-shadow: inset 0 0 15px rgba(0,0,0,0.5); transform: translateZ(40px); margin-bottom: 0; }
-            .control-panel { background: none; border: none; box-shadow: none; backdrop-filter: none; padding: 1rem 0 0 0; margin-top: 1rem; border-top: 1px solid var(--machine-border); }
-            .pending-panel { transform: translateZ(15px) translateX(-10px) rotateY(8deg); }
-            .payouts-panel { transform: translateZ(15px) translateX(10px) rotateY(-8deg); }
-            .side-panel ul { max-height: 120px; }
+            body {
+                justify-content: center; /* Center the entire console vertically */
+                padding: 1rem;
+            }
+
+            .console-container {
+                max-width: 1400px;
+                background: var(--machine-bg);
+                border: 1px solid var(--machine-border);
+                border-radius: 20px;
+                padding: 1.5rem;
+                box-shadow: 0 25px 70px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.05), inset 0 0 50px rgba(0,0,0,0.8);
+                
+                /* DYNAMIC SIZING: Use flexbox and viewport height to ensure it fits */
+                display: flex;
+                flex-direction: column;
+                height: calc(100vh - 2rem); /* Force height to fit screen, accounting for body padding */
+                max-height: 900px; /* Sanity check for extremely tall screens */
+            }
+
+            .top-section { flex-shrink: 0; /* Prevent this section from shrinking */ }
+            .main-screen { max-width: 650px; margin: 0 auto; }
+            .reel { 
+                 /* Tie reel size to viewport height for dynamic scaling */
+                width: clamp(100px, 15vh, 130px); 
+                height: clamp(100px, 15vh, 130px);
+            }
+
+            /* The 4-column grid for all informational panels */
+            .bottom-section-panels {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 1.5rem;
+                margin-top: 0;
+                padding-top: 1.5rem;
+                border-top: 1px solid var(--machine-border);
+                
+                /* DYNAMIC SIZING: Allow this section to grow/shrink to fill available space */
+                flex-grow: 1;
+                min-height: 0; /* Required for flex-grow to work correctly with overflow */
+            }
+
+            .info-panel {
+                background: var(--panel-bg-light);
+                border-radius: 15px;
+                padding: 1rem;
+                
+                /* DYNAMIC SIZING: Use flexbox to manage internal content height */
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+            }
+
+            .info-panel h3 {
+                font-size: 1rem;
+                margin-bottom: 0.75rem;
+                padding-bottom: 0.5rem;
+                flex-shrink: 0; /* Prevent headers from shrinking */
+            }
+            
+            /* CRITICAL: This makes all lists scrollable within their panels */
+            .info-panel ul {
+                overflow-y: auto; /* Enable vertical scrolling */
+                flex-grow: 1; /* Allow list to fill available space */
+                padding-right: 0.5rem; /* Space for scrollbar */
+            }
+
+            .info-panel li, .info-panel .paytable-item { font-size: 0.85rem; }
+            .rules-list { font-size: 0.9rem; }
         }
     </style>
 </head>
 <body>
 
-<canvas id="particle-canvas"></canvas>
+    <canvas id="particle-canvas"></canvas>
 
-<div id="audio-unlock-overlay">
-    <div class="startup-box">
-        <img src="/logo.gif" alt="PUMP SLOTS Logo" id="startup-logo">
-        <h1 id="startup-title">PUMP SLOTS</h1>
-        <p id="startup-text">A retro-futuristic slot machine on the blockchain.</p>
-        <button id="connect-button">Enter Arcade</button>
-    </div>
-</div>
-
-<div class="machine-container" style="visibility: hidden;">
-    <div class="machine-body" id="machine-body">
-        
-        <div class="pending-panel side-panel">
-            <h3><i class="fa-solid fa-satellite-dish"></i> Incoming Signals</h3>
-            <ul id="pending-spins-list"></ul>
-            <h3><i class="fa-solid fa-trophy"></i> Recent Winners</h3>
-            <ul id="winners-list"></ul>
+    <div id="audio-unlock-overlay">
+        <div class="startup-box">
+            <img src="/logo.gif" alt="PUMP SLOTS Logo" id="startup-logo">
+            <h1 id="startup-title">PUMP SLOTS</h1>
+            <p id="startup-text">A retro-futuristic slot machine on the blockchain.</p>
+            <button id="connect-button">Enter Arcade</button>
         </div>
+    </div>
 
-        <div class="main-console">
+    <div class="console-container" style="visibility: hidden;">
+
+        <div class="top-section">
             <header class="machine-header">
                 <h1>PUMP SLOTS</h1>
                 <div id="jackpot-display">0.00</div>
@@ -184,259 +227,283 @@
                 <div id="current-spinner-address"></div>
                 <div id="result-message">Awaiting Signal...</div>
             </div>
-            <div class="control-panel">
-                <h3 class="rules-header"><i class="fa-solid fa-gavel"></i> Game Rules</h3>
-                <ul class="rules-list">
-                    <li><i class="fa-solid fa-hand-holding-dollar rule-icon"></i>Holder Check: Your balance is verified before the spin.</li>
-                    <li><i class="fa-solid fa-ban rule-icon"></i>Selling tokens results in a 1.5-hour cooldown.</li>
+        </div>
+
+        <div class="bottom-section-panels">
+
+            <div class="info-panel" id="pending-panel">
+                <h3><i class="fa-solid fa-satellite-dish"></i> Incoming Signals</h3>
+                <ul id="pending-spins-list"></ul>
+                <h3><i class="fa-solid fa-trophy"></i> Recent Winners</h3>
+                <ul id="winners-list"></ul>
+            </div>
+            
+            <div class="info-panel" id="payouts-panel">
+                <h3><i class="fa-solid fa-book-open"></i> Payout Matrix</h3>
+                <ul id="paytable-list"></ul>
+            </div>
+
+            <div class="info-panel" id="rules-panel">
+                <h3><i class="fa-solid fa-gamepad"></i> How To Play</h3>
+                <ul class="rules-list" id="how-to-play-list">
+                     <li><i class="fa-solid fa-bolt rule-icon"></i><strong>Instant Spin:</strong> Every token purchase grants you an instant spin!</li>
+                     <li><i class="fa-solid fa-gifts rule-icon"></i><strong>Daily Airdrop:</strong> All holders get 3 free spins daily. Launching TODAY!</li>
+                     <li><i class="fa-solid fa-hand-holding-dollar rule-icon"></i><strong>Holder Check:</strong> Must hold 80% of your total purchase amount to be eligible.</li>
+                     <li><i class="fa-solid fa-ban rule-icon"></i><strong>Cooldown:</strong> Selling tokens results in a 1.5-hour game cooldown.</li>
                 </ul>
             </div>
-        </div>
-        
-        <div class="payouts-panel side-panel">
-            <h3><i class="fa-solid fa-book-open"></i> Payout Matrix</h3>
-            <ul id="paytable-list"></ul>
+
+            <div class="info-panel" id="trust-panel">
+                <h3><i class="fa-solid fa-shield-halved"></i> Trust & Transparency</h3>
+                 <ul class="rules-list" id="trust-list">
+                    <li><i class="fa-solid fa-wallet rule-icon"></i>Our Payout Treasury wallet must hold a large token balance.</li>
+                    <li><i class="fa-solid fa-circle-check rule-icon"></i>This is for YOU. It guarantees we can pay all prizes instantly.</li>
+                    <li><i class="fa-solid fa-building-columns rule-icon"></i>Think of it as a casino's vault – it has to be full to pay the winners. Your trust is our priority.</li>
+                </ul>
+            </div>
+
         </div>
     </div>
-</div>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    let SYMBOLS = [];
-    const REEL_SETS = 20;
-    const SPIN_BASE_DURATION = 2000;
-    
-    const reelElements = [document.querySelector('#reel1'), document.querySelector('#reel2'), document.querySelector('#reel3')];
-    const jackpotDisplay = document.getElementById('jackpot-display');
-    const resultMessage = document.getElementById('result-message');
-    const spinnerAddressDisplay = document.getElementById('current-spinner-address');
-    const pendingSpinsList = document.getElementById('pending-spins-list');
-    const winnersList = document.getElementById('winners-list');
-    const paytableList = document.getElementById('paytable-list');
-    const canvas = document.getElementById('particle-canvas');
-    const ctx = canvas.getContext('2d');
-    
-    let isAnimating = false;
-    const eventQueue = [];
-    let socket;
-    const pendingTimers = new Map();
-    let particles = [];
-    let audioUnlocked = false;
 
-    const spinSound = new Audio('/sounds/spin.mp3');
-    spinSound.loop = true;
-    function playSound(soundName) {
-        if (!audioUnlocked) return;
-        try {
-            if (soundName === 'spin-start') { spinSound.currentTime = 0; spinSound.play(); }
-            else if (soundName === 'spin-stop') { spinSound.pause(); }
-            else if (['win', 'lose', 'connect', 'error'].includes(soundName)) { new Audio(`/sounds/${soundName}.mp3`).play(); }
-        } catch (e) { console.error("Audio playback error:", e); }
-    }
-    function unlockAudio() { if (!audioUnlocked) { const audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); audioUnlocked = true; } }
-
-    class Particle { constructor() { this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height; this.size = Math.random() * 1.5 + 0.5; this.speedX = (Math.random()*0.4-0.2); this.speedY = (Math.random()*0.4-0.2); this.color = `rgba(0, 229, 255, ${Math.random()*0.5+0.2})`; } update() { if(this.x > canvas.width || this.x < 0) this.speedX *= -1; if(this.y > canvas.height || this.y < 0) this.speedY *= -1; this.x += this.speedX; this.y += this.speedY; } draw() { ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); } }
-    function initParticles() { particles = []; const num = (canvas.width * canvas.height) / 18000; for (let i = 0; i < num; i++) particles.push(new Particle()); }
-    function animateParticles() { ctx.clearRect(0,0,canvas.width,canvas.height); particles.forEach(p => { p.update(); p.draw(); }); requestAnimationFrame(animateParticles); }
-    function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-
-    function formatTime(seconds) { const min = Math.floor(seconds / 60); const sec = seconds % 60; return `${min}:${sec < 10 ? '0' : ''}${sec}`; }
-    function removePendingPlayer(signature) { const item = document.getElementById(`pending-${signature}`); if (item) { item.style.opacity = '0'; setTimeout(() => item.remove(), 300); } if (pendingTimers.has(signature)) { clearInterval(pendingTimers.get(signature)); pendingTimers.delete(signature); } }
-    function addPendingPlayerToList(spinData) {
-        const { signature, traderPublicKey, executeAt } = spinData;
-        removePendingPlayer(signature);
-        const li = document.createElement('li'); li.id = `pending-${signature}`;
-        li.innerHTML = `<span class="address" title="${traderPublicKey}">${traderPublicKey.slice(0, 4)}...${traderPublicKey.slice(-4)}</span><span class="countdown"></span>`;
-        const countEl = li.querySelector('.countdown');
-        const updateCountdown = () => {
-            const secs = Math.round((executeAt - Date.now()) / 1000);
-            if (secs > 0) countEl.textContent = formatTime(secs);
-            else { countEl.textContent = "Executing..."; clearInterval(timerId); setTimeout(() => removePendingPlayer(signature), 2000); }
-        };
-        updateCountdown();
-        const timerId = setInterval(updateCountdown, 1000);
-        pendingTimers.set(signature, timerId);
-        pendingSpinsList.prepend(li);
-    }
-    
-    function getIconHeight() { return reelElements[0]?.clientHeight || 120; }
-
-    function processNextEvent() {
-        if (isAnimating || eventQueue.length === 0) return;
-        const event = eventQueue.shift();
-        if(event.type === 'spin_outcome') spin(event.payload);
-        else if (event.type === 'payout_failed') showPayoutFailure(event.payload);
-    }
-    
-    function spin(outcome) {
-        if (isAnimating || SYMBOLS.length === 0) { if(isAnimating) eventQueue.unshift({type: 'spin_outcome', payload: outcome}); return; }
-        for (const name of outcome.symbols) { if (SYMBOLS.findIndex(s => s.name === name) === -1) { console.error(`Symbol '${name}' from backend not found in frontend. Aborting spin.`); isAnimating = false; return; } }
-        isAnimating = true;
-
-        if (outcome.traderPublicKey) { spinnerAddressDisplay.textContent = `Spinning for: ${outcome.traderPublicKey}`; spinnerAddressDisplay.style.opacity = '1'; }
-        playSound('spin-start');
-        resultMessage.textContent = `Transmitting...`;
-        resultMessage.className = '';
-        reelElements.forEach(r => r.classList.remove('win-highlight'));
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        let SYMBOLS = [];
+        const REEL_SETS = 20;
+        const SPIN_BASE_DURATION = 2000;
         
-        outcome.symbols.forEach((name, i) => {
-            const reel = reelElements[i];
-            const icons = reel.querySelector('.reel-icons');
-            icons.style.transition = 'none';
-            const finalPosIndex = SYMBOLS.findIndex(s => s.name === name);
-            if(finalPosIndex === -1) { console.error(`Symbol ${name} not found in visual reel!`); return; }
-            const totalSymbolsInStrip = SYMBOLS.length * REEL_SETS;
-            const targetSymbolIndex = Math.floor(totalSymbolsInStrip / 2) + finalPosIndex;
-            const newTop = -(targetSymbolIndex * getIconHeight());
-            icons.style.top = `${newTop + (getIconHeight() * SYMBOLS.length)}px`; 
-            icons.offsetHeight; // Force reflow
-            const dur = SPIN_BASE_DURATION + i * 400;
-            icons.style.transition = `top ${dur}ms cubic-bezier(.32,1.5,.55,1.2)`;
-            icons.style.top = `${newTop}px`;
-        });
+        const reelElements = [document.querySelector('#reel1'), document.querySelector('#reel2'), document.querySelector('#reel3')];
+        const jackpotDisplay = document.getElementById('jackpot-display');
+        const resultMessage = document.getElementById('result-message');
+        const spinnerAddressDisplay = document.getElementById('current-spinner-address');
+        const pendingSpinsList = document.getElementById('pending-spins-list');
+        const winnersList = document.getElementById('winners-list');
+        const paytableList = document.getElementById('paytable-list');
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
         
-        setTimeout(() => { playSound('spin-stop'); showResult(outcome); isAnimating = false; setTimeout(processNextEvent, 1000); }, SPIN_BASE_DURATION + 800);
-    }
+        let isAnimating = false;
+        const eventQueue = [];
+        let socket;
+        const pendingTimers = new Map();
+        let particles = [];
+        let audioUnlocked = false;
 
-    function showResult(outcome) {
-        const { actualWinAmount, symbols } = outcome;
-        if (actualWinAmount > 0) {
-            resultMessage.textContent = `PAYOUT: +${actualWinAmount.toLocaleString('en-US')}`;
-            resultMessage.className = 'win-text';
-            playSound('win');
-            const [s1, s2, s3] = symbols;
-            if (s1 === s2 && s2 === s3) { reelElements.forEach(r => r.classList.add('win-highlight')); }
-            else if (s1 === s2) { reelElements[0].classList.add('win-highlight'); reelElements[1].classList.add('win-highlight'); }
-        } else {
-            resultMessage.textContent = "Signal Lost";
-            resultMessage.className = 'lose-text';
-            playSound('lose');
+        const spinSound = new Audio('/sounds/spin.mp3');
+        spinSound.loop = true;
+        function playSound(soundName) {
+            if (!audioUnlocked) return;
+            try {
+                if (soundName === 'spin-start') { spinSound.currentTime = 0; spinSound.play(); }
+                else if (soundName === 'spin-stop') { spinSound.pause(); }
+                else if (['win', 'lose', 'connect', 'error'].includes(soundName)) { new Audio(`/sounds/${soundName}.mp3`).play(); }
+            } catch (e) { console.error("Audio playback error:", e); }
+        }
+        function unlockAudio() { if (!audioUnlocked) { const audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); audioUnlocked = true; } }
+
+        class Particle { constructor() { this.x = Math.random() * canvas.width; this.y = Math.random() * canvas.height; this.size = Math.random() * 1.5 + 0.5; this.speedX = (Math.random()*0.4-0.2); this.speedY = (Math.random()*0.4-0.2); this.color = `rgba(0, 229, 255, ${Math.random()*0.5+0.2})`; } update() { if(this.x > canvas.width || this.x < 0) this.speedX *= -1; if(this.y > canvas.height || this.y < 0) this.speedY *= -1; this.x += this.speedX; this.y += this.speedY; } draw() { ctx.fillStyle = this.color; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill(); } }
+        function initParticles() { particles = []; const num = (canvas.width * canvas.height) / 18000; for (let i = 0; i < num; i++) particles.push(new Particle()); }
+        function animateParticles() { ctx.clearRect(0,0,canvas.width,canvas.height); particles.forEach(p => { p.update(); p.draw(); }); requestAnimationFrame(animateParticles); }
+        function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+
+        function formatTime(seconds) { const min = Math.floor(seconds / 60); const sec = seconds % 60; return `${min}:${sec < 10 ? '0' : ''}${sec}`; }
+        function removePendingPlayer(signature) { const item = document.getElementById(`pending-${signature}`); if (item) { item.style.opacity = '0'; setTimeout(() => item.remove(), 300); } if (pendingTimers.has(signature)) { clearInterval(pendingTimers.get(signature)); pendingTimers.delete(signature); } }
+        function addPendingPlayerToList(spinData) {
+            const { signature, traderPublicKey, executeAt } = spinData;
+            removePendingPlayer(signature);
+            const li = document.createElement('li'); li.id = `pending-${signature}`;
+            const shortAddress = `${traderPublicKey.slice(0, 4)}...${traderPublicKey.slice(-4)}`;
+            li.innerHTML = `<span class="address" title="${traderPublicKey}">${shortAddress}</span><span class="countdown"></span>`;
+            const countEl = li.querySelector('.countdown');
+            const updateCountdown = () => {
+                const secs = Math.round((executeAt - Date.now()) / 1000);
+                if (secs > 0) countEl.textContent = formatTime(secs);
+                else { countEl.textContent = "Executing..."; clearInterval(timerId); setTimeout(() => removePendingPlayer(signature), 2000); }
+            };
+            updateCountdown();
+            const timerId = setInterval(updateCountdown, 1000);
+            pendingTimers.set(signature, timerId);
+            pendingSpinsList.prepend(li);
         }
         
-        setTimeout(() => {
-            if (!isAnimating) {
+        function getIconHeight() { return document.querySelector('#reel1')?.clientHeight || 120; }
+
+        function processNextEvent() {
+            if (isAnimating || eventQueue.length === 0) return;
+            const event = eventQueue.shift();
+            if(event.type === 'spin_outcome') spin(event.payload);
+            else if (event.type === 'payout_failed') showPayoutFailure(event.payload);
+        }
+        
+        function spin(outcome) {
+            if (isAnimating || SYMBOLS.length === 0) { if(isAnimating) eventQueue.unshift({type: 'spin_outcome', payload: outcome}); return; }
+            for (const name of outcome.symbols) { if (SYMBOLS.findIndex(s => s.name === name) === -1) { console.error(`Symbol '${name}' from backend not found in frontend. Aborting spin.`); isAnimating = false; return; } }
+            isAnimating = true;
+
+            if (outcome.traderPublicKey) { spinnerAddressDisplay.textContent = `Spinning for: ${outcome.traderPublicKey}`; spinnerAddressDisplay.style.opacity = '1'; }
+            playSound('spin-start');
+            resultMessage.textContent = `Transmitting...`;
+            resultMessage.className = '';
+            reelElements.forEach(r => r.classList.remove('win-highlight'));
+            
+            outcome.symbols.forEach((name, i) => {
+                const reel = reelElements[i];
+                const icons = reel.querySelector('.reel-icons');
+                icons.style.transition = 'none';
+                const finalPosIndex = SYMBOLS.findIndex(s => s.name === name);
+                if(finalPosIndex === -1) { console.error(`Symbol ${name} not found in visual reel!`); return; }
+                const totalSymbolsInStrip = SYMBOLS.length * REEL_SETS;
+                const targetSymbolIndex = Math.floor(totalSymbolsInStrip / 2) + finalPosIndex;
+                const newTop = -(targetSymbolIndex * getIconHeight());
+                icons.style.top = `${newTop + (getIconHeight() * SYMBOLS.length)}px`; 
+                icons.offsetHeight; // Force reflow
+                const dur = SPIN_BASE_DURATION + i * 400;
+                icons.style.transition = `top ${dur}ms cubic-bezier(.32,1.5,.55,1.2)`;
+                icons.style.top = `${newTop}px`;
+            });
+            
+            setTimeout(() => { playSound('spin-stop'); showResult(outcome); isAnimating = false; setTimeout(processNextEvent, 1000); }, SPIN_BASE_DURATION + 800);
+        }
+
+        function showResult(outcome) {
+            const { actualWinAmount, symbols } = outcome;
+            if (actualWinAmount > 0) {
+                resultMessage.textContent = `PAYOUT: +${actualWinAmount.toLocaleString('en-US')}`;
+                resultMessage.className = 'win-text';
+                playSound('win');
+                const [s1, s2, s3] = symbols;
+                if (s1 === s2 && s2 === s3) { reelElements.forEach(r => r.classList.add('win-highlight')); }
+                else if (s1 === s2) { reelElements[0].classList.add('win-highlight'); reelElements[1].classList.add('win-highlight'); }
+            } else {
+                resultMessage.textContent = "Signal Lost";
+                resultMessage.className = 'lose-text';
+                playSound('lose');
+            }
+            
+            setTimeout(() => {
+                if (!isAnimating) {
+                    resultMessage.textContent = "Awaiting Signal...";
+                    resultMessage.className = '';
+                    spinnerAddressDisplay.textContent = '';
+                    spinnerAddressDisplay.style.opacity = '0';
+                }
+            }, 5000);
+        }
+
+        function showPayoutFailure(payload) {
+            isAnimating = true;
+            if (payload.traderPublicKey) { spinnerAddressDisplay.textContent = `Payout Failed for: ${payload.traderPublicKey}`; spinnerAddressDisplay.style.opacity = '1'; }
+            resultMessage.textContent = `WIN! PAYOUT FAILED`;
+            resultMessage.className = 'payout-fail-text';
+            playSound('error');
+            
+            setTimeout(() => {
                 resultMessage.textContent = "Awaiting Signal...";
                 resultMessage.className = '';
                 spinnerAddressDisplay.textContent = '';
                 spinnerAddressDisplay.style.opacity = '0';
-            }
-        }, 5000);
-    }
-
-    function showPayoutFailure(payload) {
-        isAnimating = true;
-        if (payload.traderPublicKey) { spinnerAddressDisplay.textContent = `Payout Failed for: ${payload.traderPublicKey}`; spinnerAddressDisplay.style.opacity = '1'; }
-        resultMessage.textContent = `WIN! PAYOUT FAILED`;
-        resultMessage.className = 'payout-fail-text';
-        playSound('error');
+                isAnimating = false;
+                setTimeout(processNextEvent, 1000);
+            }, 8000);
+        }
         
-        setTimeout(() => {
-            resultMessage.textContent = "Awaiting Signal...";
-            resultMessage.className = '';
-            spinnerAddressDisplay.textContent = '';
-            spinnerAddressDisplay.style.opacity = '0';
-            isAnimating = false;
-            setTimeout(processNextEvent, 1000);
-        }, 8000);
-    }
-    
-    // ## FIXED: This function now correctly builds the visual reels ##
-    function populateReels() {
-        if (SYMBOLS.length === 0) return;
-        const iconHeight = getIconHeight();
-        reelElements.forEach(reel => {
-            const icons = reel.querySelector('.reel-icons');
-            icons.innerHTML = '';
-            const frag = document.createDocumentFragment();
-            for (let i = 0; i < REEL_SETS; i++) {
-                // Use the SYMBOLS array directly from the server to ensure a perfect match
-                for (const sym of SYMBOLS) {
-                    const icon = document.createElement('i');
-                    icon.className = `fa-solid ${sym.class}`;
-                    frag.appendChild(icon);
+        function populateReels() {
+            if (SYMBOLS.length === 0) return;
+            reelElements.forEach(reel => {
+                const icons = reel.querySelector('.reel-icons');
+                icons.innerHTML = '';
+                const frag = document.createDocumentFragment();
+                for (let i = 0; i < REEL_SETS; i++) {
+                    for (const sym of SYMBOLS) {
+                        const icon = document.createElement('i');
+                        icon.className = `fa-solid ${sym.class}`;
+                        frag.appendChild(icon);
+                    }
                 }
-            }
-            icons.appendChild(frag);
-            Array.from(icons.children).forEach(icon => {
-                const size = iconHeight;
-                icon.style.lineHeight = `${size}px`;
-                icon.style.fontSize = `${size * 0.60}px`;
+                icons.appendChild(frag);
+                const reelSize = reel.clientHeight;
+                Array.from(icons.children).forEach(icon => {
+                    icon.style.lineHeight = `${reelSize}px`;
+                    icon.style.fontSize = `${reelSize * 0.60}px`;
+                });
             });
-        });
-    }
-    
-    function populatePaytable() {
-        if (SYMBOLS.length === 0) return;
-        paytableList.innerHTML = '';
-        const payingSymbols = SYMBOLS.filter(s => s.payout > 0);
-        payingSymbols.slice().sort((a,b) => b.payout - a.payout).forEach(s => {
-            const li = document.createElement('li');
-            li.className = 'paytable-item';
-            let payout2x = '';
-            const twoOfAKindWinners = ['lemon', 'clover', 'bell'];
-            if (twoOfAKindWinners.includes(s.name)) {
-                const p2val = (s.payout * 0.20).toFixed(2).replace(/\.00$|\.([1-9])0$/, '.$1');
-                payout2x = `<div class="payout-entry"><strong>2x</strong> <span class="payout-value">${p2val}%</span></div>`;
-            }
-            li.innerHTML = `<i class="fa-solid ${s.class} paytable-main-icon"></i><div class="paytable-payouts"><div class="payout-entry"><strong>3x</strong> <span class="payout-value">${s.payout}%</span></div>${payout2x}</div>`;
-            paytableList.appendChild(li);
-        });
-    }
-
-    function renderWinnersList(winners) { winnersList.innerHTML = ''; winners.forEach(winner => { const li = document.createElement('li'); li.innerHTML = `<span class="time">${winner.time}</span> <span class="amount">+${winner.amount.toLocaleString('en-US')}</span>`; winnersList.appendChild(li); }); }
-    
-    function connectToServer() {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}`;
-        socket = new WebSocket(wsUrl);
-        socket.onopen = () => { resultMessage.textContent = 'System Online'; };
-        socket.onclose = () => { resultMessage.textContent = 'Link Severed... Reconnecting'; setTimeout(connectToServer, 5000); };
-        socket.onerror = () => { resultMessage.textContent = 'Connection Error'; };
-        socket.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                switch (data.type) {
-                    case 'initial_state':
-                        if (data.payload.symbols) { SYMBOLS = data.payload.symbols; populatePaytable(); populateReels(); }
-                        if (data.payload.jackpot !== undefined) { jackpotDisplay.textContent = data.payload.jackpot.toLocaleString('en-US', { maximumFractionDigits: 0 }); jackpotDisplay.classList.remove('stale'); }
-                        if (data.payload.recentWinners) { renderWinnersList(data.payload.recentWinners); }
-                        if (data.payload.pendingSpins) { pendingSpinsList.innerHTML = ''; pendingTimers.forEach(t => clearInterval(t)); pendingTimers.clear(); data.payload.pendingSpins.sort((a, b) => a.executeAt - b.executeAt).forEach(addPendingPlayerToList); }
-                        break;
-                    case 'update_state': if (data.payload.recentWinners) renderWinnersList(data.payload.recentWinners); break;
-                    case 'jackpot_update': if (data.payload.jackpot !== undefined) { jackpotDisplay.textContent = data.payload.jackpot.toLocaleString('en-US', { maximumFractionDigits: 0 }); jackpotDisplay.classList.remove('stale'); } break;
-                    case 'jackpot_update_failed': jackpotDisplay.classList.add('stale'); break;
-                    case 'spin_pending': addPendingPlayerToList(data.payload); break;
-                    case 'spin_cancelled': removePendingPlayer(data.payload.signature); break;
-                    case 'spin_outcome': case 'payout_failed': eventQueue.push(data); processNextEvent(); break;
-                    default: console.warn('Received unknown WebSocket event type:', data.type, data.payload);
-                }
-            } catch (e) { console.error("Failed to process message:", e); }
-        };
-    }
-    
-    function init() {
-        const connectButton = document.getElementById('connect-button');
-        const appContainer = document.querySelector('.machine-container');
-        const overlay = document.getElementById('audio-unlock-overlay');
+        }
         
-        connectButton.addEventListener('click', () => {
-            unlockAudio();
-            playSound('connect');
-            overlay.style.opacity = '0';
-            setTimeout(() => {
-                overlay.style.display = 'none';
-                appContainer.style.visibility = 'visible';
-                resizeCanvas();
-                initParticles();
-                animateParticles();
-                window.addEventListener('resize', resizeCanvas);
-                connectToServer();
-            }, 500);
-        }, { once: true });
-    }
-    
-    init();
-});
-</script>
+        function populatePaytable() {
+            if (SYMBOLS.length === 0) return;
+            paytableList.innerHTML = '';
+            const payingSymbols = SYMBOLS.filter(s => s.payout > 0);
+            payingSymbols.slice().sort((a,b) => b.payout - a.payout).forEach(s => {
+                const li = document.createElement('li');
+                li.className = 'paytable-item';
+                let payout2x = '';
+                const twoOfAKindWinners = ['lemon', 'clover', 'bell'];
+                if (twoOfAKindWinners.includes(s.name)) {
+                    const p2val = (s.payout * 0.20).toFixed(2).replace(/\.00$|\.([1-9])0$/, '.$1');
+                    payout2x = `<div class="payout-entry"><strong>2x</strong> <span class="payout-value">${p2val}%</span></div>`;
+                }
+                li.innerHTML = `<i class="fa-solid ${s.class} paytable-main-icon"></i><div class="paytable-payouts"><div class="payout-entry"><strong>3x</strong> <span class="payout-value">${s.payout}%</span></div>${payout2x}</div>`;
+                paytableList.appendChild(li);
+            });
+        }
+
+        function renderWinnersList(winners) { winnersList.innerHTML = ''; winners.forEach(winner => { const li = document.createElement('li'); li.innerHTML = `<span class="time">${winner.time}</span> <span class="amount">+${winner.amount.toLocaleString('en-US')}</span>`; winnersList.appendChild(li); }); }
+        
+        function connectToServer() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}`;
+            socket = new WebSocket(wsUrl);
+            socket.onopen = () => { resultMessage.textContent = 'System Online'; };
+            socket.onclose = () => { resultMessage.textContent = 'Link Severed... Reconnecting'; setTimeout(connectToServer, 5000); };
+            socket.onerror = () => { resultMessage.textContent = 'Connection Error'; };
+            socket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    switch (data.type) {
+                        case 'initial_state':
+                            if (data.payload.symbols) { SYMBOLS = data.payload.symbols; populatePaytable(); populateReels(); }
+                            if (data.payload.jackpot !== undefined) { jackpotDisplay.textContent = data.payload.jackpot.toLocaleString('en-US', { maximumFractionDigits: 0 }); jackpotDisplay.classList.remove('stale'); }
+                            if (data.payload.recentWinners) { renderWinnersList(data.payload.recentWinners); }
+                            if (data.payload.pendingSpins) { pendingSpinsList.innerHTML = ''; pendingTimers.forEach(t => clearInterval(t)); pendingTimers.clear(); data.payload.pendingSpins.sort((a, b) => a.executeAt - b.executeAt).forEach(addPendingPlayerToList); }
+                            break;
+                        case 'update_state': if (data.payload.recentWinners) renderWinnersList(data.payload.recentWinners); break;
+                        case 'jackpot_update': if (data.payload.jackpot !== undefined) { jackpotDisplay.textContent = data.payload.jackpot.toLocaleString('en-US', { maximumFractionDigits: 0 }); jackpotDisplay.classList.remove('stale'); } break;
+                        case 'jackpot_update_failed': jackpotDisplay.classList.add('stale'); break;
+                        case 'spin_pending': addPendingPlayerToList(data.payload); break;
+                        case 'spin_cancelled': removePendingPlayer(data.payload.signature); break;
+                        case 'spin_outcome': case 'payout_failed': eventQueue.push(data); processNextEvent(); break;
+                        default: console.warn('Received unknown WebSocket event type:', data.type, data.payload);
+                    }
+                } catch (e) { console.error("Failed to process message:", e); }
+            };
+        }
+        
+        function init() {
+            const connectButton = document.getElementById('connect-button');
+            const appContainer = document.querySelector('.console-container');
+            const overlay = document.getElementById('audio-unlock-overlay');
+            
+            connectButton.addEventListener('click', () => {
+                unlockAudio();
+                playSound('connect');
+                overlay.style.opacity = '0';
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    appContainer.style.visibility = 'visible';
+                    resizeCanvas();
+                    initParticles();
+                    animateParticles();
+                    window.addEventListener('resize', () => {
+                        resizeCanvas();
+                        populateReels(); /* Re-calculate icon sizes on resize */
+                    });
+                    connectToServer();
+                }, 500);
+            }, { once: true });
+        }
+        
+        init();
+    });
+    </script>
 
 </body>
 </html>
