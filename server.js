@@ -22,6 +22,8 @@ import {
     getMint,
     getAccount,
     getAssociatedTokenAddress,
+    AccountLayout,
+    TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 
 dotenv.config();
@@ -160,33 +162,45 @@ async function withRpcRetry(rpcCall) {
     }
 }
 
+async function getAllTokenHolders(mintAddress) {
+    const accounts = await withRpcRetry(() => connection.getProgramAccounts(
+        TOKEN_PROGRAM_ID, {
+            filters: [
+                { dataSize: 165 },
+                { memcmp: { offset: 0, bytes: mintAddress.toBase58() } },
+            ],
+        }
+    ));
+    return accounts.map(account => {
+        const accountInfo = AccountLayout.decode(account.account.data);
+        return {
+            address: new PublicKey(accountInfo.owner).toBase58(),
+            balance: accountInfo.amount,
+        };
+    }).filter(holder => holder.balance > 0n);
+}
+
 async function sendPayoutTransaction(winnerAddress, amountInTokens) {
     try {
         if (!devWallet) throw new Error("Dev wallet is not initialized.");
         const mintPublicKey = new PublicKey(config.TOKEN_MINT_TO_PAY_WITH);
         const winnerPublicKey = new PublicKey(winnerAddress);
         const devWalletPublicKey = devWallet.publicKey;
-
         const mintInfo = await withRpcRetry(() => getMint(connection, mintPublicKey));
         const decimals = mintInfo.decimals;
         const transferAmount = BigInt(Math.floor(amountInTokens * (10 ** decimals)));
         if (transferAmount <= 0n) throw new Error("Transfer amount is zero.");
-
         const sourceAta = await withRpcRetry(() => getOrCreateAssociatedTokenAccount(connection, devWallet, mintPublicKey, devWalletPublicKey));
         const destinationAta = await withRpcRetry(() => getOrCreateAssociatedTokenAccount(connection, devWallet, mintPublicKey, winnerPublicKey));
-
         const instructions = [
             ComputeBudgetProgram.setComputeUnitPrice({ microLamports: PAYOUT_PRIORITY_FEE_MICRO_LAMPORTS }),
             createTransferCheckedInstruction(sourceAta.address, mintPublicKey, destinationAta.address, devWalletPublicKey, transferAmount, decimals)
         ];
-
         const { blockhash } = await withRpcRetry(() => connection.getLatestBlockhash());
         const transaction = new Transaction({ recentBlockhash: blockhash, feePayer: devWalletPublicKey }).add(...instructions);
-
         const signature = await withRpcRetry(() => sendAndConfirmTransaction(connection, transaction, [devWallet], { skipPreflight: false, commitment: "confirmed", preflightCommitment: "confirmed" }));
         console.log(`✅ Payout successful! Signature: ${signature}`);
         return signature;
-
     } catch (error) {
         console.error("❌ Payout Transaction Failed permanently:", error.message);
         return null;
@@ -196,61 +210,42 @@ async function sendPayoutTransaction(winnerAddress, amountInTokens) {
 function calculateWin(resultSymbols, betAmount) {
     const [s1, s2, s3] = resultSymbols;
     let payoutPercent = 0;
-
-    if (s1.name === 'skull' || s2.name === 'skull' || s3.name === 'skull') {
-        return 0;
-    }
-
+    if (s1.name === 'skull' || s2.name === 'skull' || s3.name === 'skull') return 0;
     const twoOfAKindWinners = ['lemon', 'clover', 'bell'];
-
-    if (s1.name === s2.name && s2.name === s3.name) {
-        payoutPercent = s1.payout;
-    } else if (s1.name === s2.name && twoOfAKindWinners.includes(s1.name)) {
-        payoutPercent = s1.payout * 0.20;
-    }
-
+    if (s1.name === s2.name && s2.name === s3.name) payoutPercent = s1.payout;
+    else if (s1.name === s2.name && twoOfAKindWinners.includes(s1.name)) payoutPercent = s1.payout * 0.20;
     return payoutPercent > 0 ? Math.max(1, Math.round(betAmount * (payoutPercent / 100))) : 0;
 }
 
-// ## FIXED: Robust function to handle zero-weight skulls ##
 function generateLosingCombination() {
     console.log("Forcing a loss. Deterministically generating a losing combination...");
     const payingSymbols = SYMBOLS.filter(s => s.name !== 'skull');
-
-    if (payingSymbols.length < 3) {
-        return [
-            SYMBOLS.find(s => s.name === 'lemon') || SYMBOLS[0],
-            SYMBOLS.find(s => s.name === 'clover') || SYMBOLS[1] || SYMBOLS[0],
-            SYMBOLS.find(s => s.name === 'bell') || SYMBOLS[2] || SYMBOLS[1] || SYMBOLS[0]
-        ];
-    }
+    if (payingSymbols.length < 3) return [SYMBOLS.find(s => s.name === 'lemon') || SYMBOLS[0], SYMBOLS.find(s => s.name === 'clover') || SYMBOLS[1] || SYMBOLS[0], SYMBOLS.find(s => s.name === 'bell') || SYMBOLS[2] || SYMBOLS[1] || SYMBOLS[0]];
     return [payingSymbols[0], payingSymbols[1], payingSymbols[2]];
 }
 
-async function executeSpin(traderPublicKeyStr, betAmount) {
-    // ## CRITICAL BUG FIX: Prevent crash if all weights are 0 ##
+async function executeSpin(traderPublicKeyStr, betAmount, options = {}) {
+    const { skipHolderCheck = false, isHolderSpin = false } = options;
+
     if (WEIGHTED_REEL.length === 0) {
         console.error("🚨 CRITICAL ERROR: WEIGHTED_REEL is empty. Cannot perform spin. Check symbol weights. Forcing loss.");
-        broadcast({ type: 'spin_outcome', payload: { symbols: generateLosingCombination().map(s=>s.name), actualWinAmount: 0, traderPublicKey: traderPublicKeyStr } });
+        broadcast({ type: 'spin_outcome', payload: { symbols: generateLosingCombination().map(s => s.name), actualWinAmount: 0, traderPublicKey: traderPublicKeyStr, isHolderSpin } });
         return;
     }
 
     if (forcedWinnerAddress && traderPublicKeyStr === forcedWinnerAddress) {
         console.log(`✨ Executing FORCED WIN for ${traderPublicKeyStr}`);
         forcedWinnerAddress = null;
-
         const jackpotSymbol = SYMBOLS.find(s => s.name === 'gem');
         const resultSymbols = [jackpotSymbol, jackpotSymbol, jackpotSymbol];
         let calculatedWin = calculateWin(resultSymbols, betAmount);
         let actualWinAmount = Math.min(calculatedWin, currentJackpot);
-        let outcomePayload = { symbols: resultSymbols.map(s => s.name), actualWinAmount, traderPublicKey: traderPublicKeyStr };
-
+        let outcomePayload = { symbols: resultSymbols.map(s => s.name), actualWinAmount, traderPublicKey: traderPublicKeyStr, isHolderSpin };
         if (actualWinAmount > 0) {
             const signature = await sendPayoutTransaction(traderPublicKeyStr, actualWinAmount);
             if (signature) {
-                currentJackpot -= actualWinAmount;
-                totalPayout += actualWinAmount;
-                recentWinners.unshift({ time: new Date().toLocaleTimeString('nl-NL'), amount: actualWinAmount });
+                currentJackpot -= actualWinAmount; totalPayout += actualWinAmount;
+                recentWinners.unshift({ time: new Date().toLocaleTimeString('nl-NL', { timeZone: 'Europe/Amsterdam' }), amount: actualWinAmount });
                 if (recentWinners.length > 50) recentWinners.pop();
                 saveState();
                 broadcast({ type: 'update_state', payload: { totalPayout, recentWinners } });
@@ -266,59 +261,52 @@ async function executeSpin(traderPublicKeyStr, betAmount) {
         return;
     }
 
-    try {
-        const totalPurchasedByTrader = traderPurchaseHistory.get(traderPublicKeyStr) || 0;
-        const requiredBalanceThreshold = totalPurchasedByTrader * 0.80;
-        const traderPublicKey = new PublicKey(traderPublicKeyStr);
-        const mintPublicKey = new PublicKey(config.TOKEN_MINT_TO_WATCH);
-        const mintInfo = await withRpcRetry(() => getMint(connection, mintPublicKey));
-
-        let currentBalance = 0;
+    if (!skipHolderCheck) {
         try {
-            const ata = await getAssociatedTokenAddress(mintPublicKey, traderPublicKey);
-            const accountInfo = await withRpcRetry(() => getAccount(connection, ata));
-            currentBalance = Number(accountInfo.amount) / (10 ** mintInfo.decimals);
-        } catch (e) {
-            if (e.name === 'TokenAccountNotFoundError') {
-                 console.log(`[Holder Check] Token account not found for ${traderPublicKeyStr.slice(0,6)}, balance is 0.`);
-            } else {
-                console.error(`[Holder Check] Error fetching balance for ${traderPublicKeyStr.slice(0,6)}: ${e.message}.`);
+            const totalPurchasedByTrader = traderPurchaseHistory.get(traderPublicKeyStr) || 0;
+            const requiredBalanceThreshold = totalPurchasedByTrader * 0.80;
+            const traderPublicKey = new PublicKey(traderPublicKeyStr);
+            const mintPublicKey = new PublicKey(config.TOKEN_MINT_TO_WATCH);
+            const mintInfo = await withRpcRetry(() => getMint(connection, mintPublicKey));
+            let currentBalance = 0;
+            try {
+                const ata = await getAssociatedTokenAddress(mintPublicKey, traderPublicKey);
+                const accountInfo = await withRpcRetry(() => getAccount(connection, ata));
+                currentBalance = Number(accountInfo.amount) / (10 ** mintInfo.decimals);
+            } catch (e) {
+                if (e.name === 'TokenAccountNotFoundError') console.log(`[Holder Check] Token account not found for ${traderPublicKeyStr.slice(0, 6)}, balance is 0.`);
+                else console.error(`[Holder Check] Error fetching balance for ${traderPublicKeyStr.slice(0, 6)}: ${e.message}.`);
+                currentBalance = 0;
             }
-            currentBalance = 0;
-        }
-
-        if (currentBalance < requiredBalanceThreshold) {
-            console.log(`🚫 Spin cancelled for ${traderPublicKeyStr.slice(0,6)}. Current balance (${currentBalance.toFixed(2)}) is below 80% of total purchased (${requiredBalanceThreshold.toFixed(2)}).`);
+            if (currentBalance < requiredBalanceThreshold) {
+                console.log(`🚫 Spin cancelled for ${traderPublicKeyStr.slice(0, 6)}. Current balance (${currentBalance.toFixed(2)}) is below 80% of total purchased (${requiredBalanceThreshold.toFixed(2)}).`);
+                return;
+            }
+        } catch (e) {
+            console.error(`❌ Error during holder check for ${traderPublicKeyStr.slice(0, 6)}: ${e.message}. Spin cancelled.`);
             return;
         }
-    } catch(e) {
-        console.error(`❌ Error during holder check for ${traderPublicKeyStr.slice(0,6)}: ${e.message}. Spin cancelled.`);
-        return;
+    } else {
+        console.log(`[Admin Spin] Skipping 80% holder check for ${traderPublicKeyStr.slice(0, 6)}.`);
     }
 
     if (betAmount > (currentJackpot * 0.10)) {
-        console.log(`🚨 Player ${traderPublicKeyStr.slice(0,6)} bet >10% of jackpot. Forcing loss.`);
+        console.log(`🚨 Player ${traderPublicKeyStr.slice(0, 6)} bet >10% of jackpot. Forcing loss.`);
         const losingSymbols = generateLosingCombination();
-        broadcast({ type: 'spin_outcome', payload: { symbols: losingSymbols.map(s => s.name), actualWinAmount: 0, traderPublicKey: traderPublicKeyStr } });
+        broadcast({ type: 'spin_outcome', payload: { symbols: losingSymbols.map(s => s.name), actualWinAmount: 0, traderPublicKey: traderPublicKeyStr, isHolderSpin } });
         return;
     }
 
-    const resultSymbols = [
-        WEIGHTED_REEL[Math.floor(Math.random() * WEIGHTED_REEL.length)],
-        WEIGHTED_REEL[Math.floor(Math.random() * WEIGHTED_REEL.length)],
-        WEIGHTED_REEL[Math.floor(Math.random() * WEIGHTED_REEL.length)]
-    ];
-
+    const resultSymbols = [WEIGHTED_REEL[Math.floor(Math.random() * WEIGHTED_REEL.length)], WEIGHTED_REEL[Math.floor(Math.random() * WEIGHTED_REEL.length)], WEIGHTED_REEL[Math.floor(Math.random() * WEIGHTED_REEL.length)]];
     const calculatedWin = calculateWin(resultSymbols, betAmount);
     let actualWinAmount = Math.min(calculatedWin, currentJackpot);
-    let outcomePayload = { symbols: resultSymbols.map(s => s.name), actualWinAmount, traderPublicKey: traderPublicKeyStr };
+    let outcomePayload = { symbols: resultSymbols.map(s => s.name), actualWinAmount, traderPublicKey: traderPublicKeyStr, isHolderSpin };
 
     if (actualWinAmount > 0) {
         const signature = await sendPayoutTransaction(traderPublicKeyStr, actualWinAmount);
         if (signature) {
-            currentJackpot -= actualWinAmount;
-            totalPayout += actualWinAmount;
-            recentWinners.unshift({ time: new Date().toLocaleTimeString('nl-NL'), amount: actualWinAmount });
+            currentJackpot -= actualWinAmount; totalPayout += actualWinAmount;
+            recentWinners.unshift({ time: new Date().toLocaleTimeString('nl-NL', { timeZone: 'Europe/Amsterdam' }), amount: actualWinAmount });
             if (recentWinners.length > 50) recentWinners.pop();
             saveState();
             broadcast({ type: 'update_state', payload: { totalPayout, recentWinners } });
@@ -341,9 +329,7 @@ function handleTradeData(tradeData) {
     if (isShuttingDown || !tradeData.signature || tradeData.mint !== config.TOKEN_MINT_TO_WATCH) return;
     if (processedSignatures.has(tradeData.signature) || pendingSpins.has(tradeData.signature)) return;
     processedSignatures.add(tradeData.signature);
-
     const { signature, traderPublicKey, mint, txType, tokenAmount } = tradeData;
-
     if (txType === 'buy') {
         const blacklistedUntil = blacklist.get(traderPublicKey);
         if (blacklistedUntil && Date.now() < blacklistedUntil) {
@@ -353,14 +339,11 @@ function handleTradeData(tradeData) {
         } else if (blacklistedUntil) {
             blacklist.delete(traderPublicKey);
         }
-
         const betAmount = Math.ceil(tokenAmount);
         if (betAmount <= 0) return;
-
         const currentTotal = traderPurchaseHistory.get(traderPublicKey) || 0;
         traderPurchaseHistory.set(traderPublicKey, currentTotal + betAmount);
-        console.log(`[History] Trader ${traderPublicKey.slice(0,6)} bought ${betAmount}. New total: ${traderPurchaseHistory.get(traderPublicKey)}`);
-
+        console.log(`[History] Trader ${traderPublicKey.slice(0, 6)} bought ${betAmount}. New total: ${traderPurchaseHistory.get(traderPublicKey)}`);
         console.log(`Player ${traderPublicKey.slice(0, 6)} bought. Starting timer.`);
         const executeAt = Date.now() + SPIN_WAIT_TIME_MS;
         const timerId = setTimeout(() => {
@@ -368,19 +351,15 @@ function handleTradeData(tradeData) {
             saveState();
             spinQueue.push(() => executeSpin(traderPublicKey, betAmount));
         }, SPIN_WAIT_TIME_MS);
-
         pendingSpins.set(signature, { traderPublicKey, mint, betAmount, executeAt, timerId });
         broadcast({ type: 'spin_pending', payload: { signature, traderPublicKey, executeAt } });
     } else if (txType === 'sell') {
         const expiryTimestamp = Date.now() + BLACKLIST_DURATION_MS;
         blacklist.set(traderPublicKey, expiryTimestamp);
-        console.log(`⚫️ User ${traderPublicKey.slice(0,6)} sold tokens. Blacklisted until ${new Date(expiryTimestamp).toLocaleTimeString('nl-NL')}.`);
-
+        console.log(`⚫️ User ${traderPublicKey.slice(0, 6)} sold tokens. Blacklisted until ${new Date(expiryTimestamp).toLocaleTimeString('nl-NL', { timeZone: 'Europe/Amsterdam' })}.`);
         const spinsToCancel = [];
         for (const [sig, spin] of pendingSpins.entries()) {
-            if (spin.traderPublicKey === traderPublicKey && spin.mint === mint) {
-                spinsToCancel.push(sig);
-            }
+            if (spin.traderPublicKey === traderPublicKey && spin.mint === mint) spinsToCancel.push(sig);
         }
         if (spinsToCancel.length > 0) {
             console.log(`Cancelling ${spinsToCancel.length} pending spin(s) for seller.`);
@@ -413,12 +392,7 @@ function connectToPumpPortal() {
         pumpWs.send(JSON.stringify({ method: "subscribeTokenTrade", keys: [config.TOKEN_MINT_TO_WATCH] }));
     });
     pumpWs.on('message', (event) => { try { handleTradeData(JSON.parse(event.toString())); } catch (e) { console.error("Error processing pump.fun message", e); } });
-    pumpWs.on('close', () => {
-        if (!isShuttingDown) {
-            console.log('PumpPortal connection closed. Reconnecting in 5s...');
-            setTimeout(connectToPumpPortal, 5000);
-        }
-    });
+    pumpWs.on('close', () => { if (!isShuttingDown) { console.log('PumpPortal connection closed. Reconnecting in 5s...'); setTimeout(connectToPumpPortal, 5000); } });
     pumpWs.on('error', (err) => { console.error('PumpPortal WebSocket error:', err.message); pumpWs.close(); });
 }
 
@@ -431,9 +405,7 @@ wss.on('connection', (ws) => {
     ws.isAlive = true;
     ws.on('pong', () => { ws.isAlive = true; });
     console.log('Frontend client connected.');
-    const pendingSpinsArray = Array.from(pendingSpins.entries()).map(([signature, data]) => ({
-        signature, traderPublicKey: data.traderPublicKey, executeAt: data.executeAt
-    }));
+    const pendingSpinsArray = Array.from(pendingSpins.entries()).map(([signature, data]) => ({ signature, traderPublicKey: data.traderPublicKey, executeAt: data.executeAt }));
     ws.send(JSON.stringify({
         type: 'initial_state',
         payload: { symbols: SYMBOLS, totalPayout, recentWinners, jackpot: currentJackpot, pendingSpins: pendingSpinsArray }
@@ -456,62 +428,28 @@ const heartbeatInterval = setInterval(() => {
 function saveState() {
     try { fs.writeFileSync(WEIGHTS_FILE, JSON.stringify(weights, null, 2)); } catch (e) { console.error("Error saving weights:", e); }
     try { fs.writeFileSync(WINNERS_FILE, JSON.stringify(recentWinners, null, 2)); } catch (e) { console.error("Error saving winners:", e); }
-    try {
-        const serializableSpins = Array.from(pendingSpins.entries()).map(([key, value]) => { const { timerId, ...rest } = value; return [key, rest]; });
-        fs.writeFileSync(PENDING_SPINS_FILE, JSON.stringify(serializableSpins, null, 2));
-    } catch (e) { console.error("Error saving pending spins:", e); }
+    try { const serializableSpins = Array.from(pendingSpins.entries()).map(([key, value]) => { const { timerId, ...rest } = value; return [key, rest]; }); fs.writeFileSync(PENDING_SPINS_FILE, JSON.stringify(serializableSpins, null, 2)); } catch (e) { console.error("Error saving pending spins:", e); }
     try { fs.writeFileSync(PROCESSED_SIGS_FILE, JSON.stringify(Array.from(processedSignatures))); } catch(e) { console.error("Error saving processed signatures:", e); }
-    try {
-        const serializableBlacklist = Array.from(blacklist.entries());
-        fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(serializableBlacklist, null, 2));
-    } catch (e) { console.error("Error saving blacklist:", e); }
-    try {
-        const serializableHistory = Array.from(traderPurchaseHistory.entries());
-        fs.writeFileSync(TRADER_HISTORY_FILE, JSON.stringify(serializableHistory, null, 2));
-    } catch (e) { console.error("Error saving trader history:", e); }
+    try { const serializableBlacklist = Array.from(blacklist.entries()); fs.writeFileSync(BLACKLIST_FILE, JSON.stringify(serializableBlacklist, null, 2)); } catch (e) { console.error("Error saving blacklist:", e); }
+    try { const serializableHistory = Array.from(traderPurchaseHistory.entries()); fs.writeFileSync(TRADER_HISTORY_FILE, JSON.stringify(serializableHistory, null, 2)); } catch (e) { console.error("Error saving trader history:", e); }
 }
 
 function loadState() {
-    try {
-        if (fs.existsSync(WEIGHTS_FILE)) {
-            const loadedWeights = JSON.parse(fs.readFileSync(WEIGHTS_FILE, 'utf-8'));
-            Object.assign(weights, loadedWeights);
-            console.log(`✅ Custom weights loaded from file.`);
-        }
-    } catch (e) { console.error("Error loading weights:", e); }
+    try { if (fs.existsSync(WEIGHTS_FILE)) { const loadedWeights = JSON.parse(fs.readFileSync(WEIGHTS_FILE, 'utf-8')); Object.assign(weights, loadedWeights); console.log(`✅ Custom weights loaded from file.`); } } catch (e) { console.error("Error loading weights:", e); }
     try { if (fs.existsSync(WINNERS_FILE)) { recentWinners = JSON.parse(fs.readFileSync(WINNERS_FILE, 'utf-8')); totalPayout = recentWinners.reduce((sum, w) => sum + w.amount, 0); console.log(`✅ ${recentWinners.length} winners loaded.`); } } catch (e) { console.error("Error loading winners:", e); }
     try { if (fs.existsSync(PROCESSED_SIGS_FILE)) { const sigs = JSON.parse(fs.readFileSync(PROCESSED_SIGS_FILE, 'utf-8')); processedSignatures = new Set(sigs); console.log(`✅ ${processedSignatures.size} processed signatures loaded.`); } } catch (e) { console.error("Error loading signatures:", e); }
-    try {
-        if (fs.existsSync(BLACKLIST_FILE)) {
-            const parsedBlacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE, 'utf-8'));
-            const now = Date.now();
-            const activeBlacklist = parsedBlacklist.filter(([, expiry]) => expiry > now);
-            blacklist = new Map(activeBlacklist);
-            console.log(`✅ ${blacklist.size} active blacklist entries loaded.`);
-        }
-    } catch (e) { console.error("Error loading blacklist:", e); }
-    try {
-        if (fs.existsSync(TRADER_HISTORY_FILE)) {
-            const parsedHistory = JSON.parse(fs.readFileSync(TRADER_HISTORY_FILE, 'utf-8'));
-            traderPurchaseHistory = new Map(parsedHistory);
-            console.log(`✅ ${traderPurchaseHistory.size} trader purchase histories loaded.`);
-        }
-    } catch (e) { console.error("Error loading trader history:", e); }
-
+    try { if (fs.existsSync(BLACKLIST_FILE)) { const parsedBlacklist = JSON.parse(fs.readFileSync(BLACKLIST_FILE, 'utf-8')); const now = Date.now(); const activeBlacklist = parsedBlacklist.filter(([, expiry]) => expiry > now); blacklist = new Map(activeBlacklist); console.log(`✅ ${blacklist.size} active blacklist entries loaded.`); } } catch (e) { console.error("Error loading blacklist:", e); }
+    try { if (fs.existsSync(TRADER_HISTORY_FILE)) { const parsedHistory = JSON.parse(fs.readFileSync(TRADER_HISTORY_FILE, 'utf-8')); traderPurchaseHistory = new Map(parsedHistory); console.log(`✅ ${traderPurchaseHistory.size} trader purchase histories loaded.`); } } catch (e) { console.error("Error loading trader history:", e); }
     try {
         if (fs.existsSync(PENDING_SPINS_FILE)) {
             const parsedSpins = JSON.parse(fs.readFileSync(PENDING_SPINS_FILE, 'utf-8'));
             parsedSpins.forEach(([signature, spinData]) => {
                 const remainingTime = spinData.executeAt - Date.now();
                 if (remainingTime <= 0) {
-                    console.log(`Spin ${signature.slice(0,6)} is overdue. Queueing for execution.`);
+                    console.log(`Spin ${signature.slice(0, 6)} is overdue. Queueing for execution.`);
                     spinQueue.push(() => executeSpin(spinData.traderPublicKey, spinData.betAmount));
                 } else {
-                    const timerId = setTimeout(() => {
-                        pendingSpins.delete(signature);
-                        saveState();
-                        spinQueue.push(() => executeSpin(spinData.traderPublicKey, spinData.betAmount));
-                    }, remainingTime);
+                    const timerId = setTimeout(() => { pendingSpins.delete(signature); saveState(); spinQueue.push(() => executeSpin(spinData.traderPublicKey, spinData.betAmount)); }, remainingTime);
                     spinData.timerId = timerId;
                     pendingSpins.set(signature, spinData);
                 }
@@ -547,44 +485,20 @@ let jackpotInterval;
 
 app.get('/api/get-settings', (req, res) => {
     const apiKey = req.headers['x-api-key'];
-    if (!apiKey || apiKey !== process.env.API_SECRET_KEY) {
-        return res.status(403).send('Forbidden: Invalid API Key');
-    }
-
+    if (!apiKey || apiKey !== process.env.API_SECRET_KEY) return res.status(403).send('Forbidden: Invalid API Key');
     const safeConfig = { ...config };
     delete safeConfig.DEV_WALLET_KEY;
-    if(devWallet) {
-        safeConfig.DEV_WALLET_PUBLIC_KEY = devWallet.publicKey.toBase58();
-    }
-
-    res.status(200).json({
-        config: safeConfig,
-        weights: weights,
-        gameStatus: {
-            currentJackpot, totalPayout,
-            pendingSpinsCount: pendingSpins.size,
-            blacklistedCount: blacklist.size,
-            forcedWinnerAddress: forcedWinnerAddress || 'None'
-        }
-    });
+    if (devWallet) safeConfig.DEV_WALLET_PUBLIC_KEY = devWallet.publicKey.toBase58();
+    res.status(200).json({ config: safeConfig, weights: weights, gameStatus: { currentJackpot, totalPayout, pendingSpinsCount: pendingSpins.size, blacklistedCount: blacklist.size, forcedWinnerAddress: forcedWinnerAddress || 'None' } });
 });
 
 app.post('/api/update-weights', (req, res) => {
     const apiKey = req.headers['x-api-key'];
-    if (!apiKey || apiKey !== process.env.API_SECRET_KEY) {
-        return res.status(403).send('Forbidden: Invalid API Key');
-    }
-
+    if (!apiKey || apiKey !== process.env.API_SECRET_KEY) return res.status(403).send('Forbidden: Invalid API Key');
     const newWeights = req.body;
     const requiredKeys = ['lemon', 'clover', 'bell', 'heart', 'star', 'diamond', 'gem', 'skull'];
-    if (!requiredKeys.every(key => newWeights.hasOwnProperty(key) && typeof newWeights[key] === 'number')) {
-        return res.status(400).send('Bad Request: Invalid or missing symbol weights.');
-    }
-
-    if (Object.values(newWeights).reduce((s, v) => s + v, 0) !== 100) {
-        return res.status(400).send('Bad Request: Total weight must be 100.');
-    }
-
+    if (!requiredKeys.every(key => newWeights.hasOwnProperty(key) && typeof newWeights[key] === 'number')) return res.status(400).send('Bad Request: Invalid or missing symbol weights.');
+    if (Object.values(newWeights).reduce((s, v) => s + v, 0) !== 100) return res.status(400).send('Bad Request: Total weight must be 100.');
     Object.assign(weights, newWeights);
     buildWeightedReel();
     saveState();
@@ -594,13 +508,9 @@ app.post('/api/update-weights', (req, res) => {
 
 app.post('/api/force-win', (req, res) => {
     const apiKey = req.headers['x-api-key'];
-    if (!apiKey || apiKey !== process.env.API_SECRET_KEY) {
-        return res.status(403).send('Forbidden: Invalid API Key');
-    }
+    if (!apiKey || apiKey !== process.env.API_SECRET_KEY) return res.status(403).send('Forbidden: Invalid API Key');
     const { traderPublicKey } = req.body;
-    if (!traderPublicKey || typeof traderPublicKey !== 'string') {
-        return res.status(400).send('Bad Request: traderPublicKey is required.');
-    }
+    if (!traderPublicKey || typeof traderPublicKey !== 'string') return res.status(400).send('Bad Request: traderPublicKey is required.');
     forcedWinnerAddress = traderPublicKey;
     console.log(`✨ Forced win set for address: ${traderPublicKey}`);
     res.status(200).json({ message: `Forced win set for ${traderPublicKey}` });
@@ -608,21 +518,15 @@ app.post('/api/force-win', (req, res) => {
 
 app.post('/api/update-config', (req, res) => {
     const apiKey = req.headers['x-api-key'];
-    if (!apiKey || apiKey !== process.env.API_SECRET_KEY) {
-        return res.status(403).send('Forbidden: Invalid API Key');
-    }
+    if (!apiKey || apiKey !== process.env.API_SECRET_KEY) return res.status(403).send('Forbidden: Invalid API Key');
     const { devWalletKey, jackpotWallet, tokenToPay, tokenToWatch } = req.body;
-    let changes = [];
-    let needsReconnect = false;
-
+    let changes = []; let needsReconnect = false;
     if (devWalletKey && devWalletKey !== config.DEV_WALLET_KEY) {
         try {
             devWallet = Keypair.fromSecretKey(bs58.decode(devWalletKey));
             config.DEV_WALLET_KEY = devWalletKey;
             changes.push(`Dev Wallet updated to: ${devWallet.publicKey.toBase58()}`);
-        } catch (e) {
-            return res.status(400).send(`Bad Request: Invalid devWalletKey: ${e.message}`);
-        }
+        } catch (e) { return res.status(400).send(`Bad Request: Invalid devWalletKey: ${e.message}`); }
     }
     if (jackpotWallet) { config.JACKPOT_WALLET_ADDRESS = jackpotWallet; changes.push('Jackpot Wallet updated.'); }
     if (tokenToPay) { config.TOKEN_MINT_TO_PAY_WITH = tokenToPay; changes.push('Token to Pay With updated.'); }
@@ -632,9 +536,50 @@ app.post('/api/update-config', (req, res) => {
         needsReconnect = true;
     }
     if (needsReconnect) connectToPumpPortal();
-
     console.log('✅ Config updated via API:', changes.join(' '));
     res.status(200).json({ message: 'Configuration updated successfully.', changes });
+});
+
+app.post('/api/spin-for-all-holders', async (req, res) => {
+    const apiKey = req.headers['x-api-key'];
+    if (!apiKey || apiKey !== process.env.API_SECRET_KEY) return res.status(403).send('Forbidden: Invalid API Key');
+    console.log("ADMIN: Received request to spin for all holders.");
+    res.status(202).json({ message: "Request accepted. Scheduling spins for eligible holders in the background. This may take some time." });
+    (async () => {
+        try {
+            const MINIMUM_UI_AMOUNT = 15000;
+            const mintAddress = new PublicKey(config.TOKEN_MINT_TO_WATCH);
+            console.log(`[SpinForAll] Fetching mint info for ${mintAddress.toBase58()}`);
+            const mintInfo = await withRpcRetry(() => getMint(connection, mintAddress));
+            const decimals = mintInfo.decimals;
+            const minBalanceRaw = BigInt(MINIMUM_UI_AMOUNT) * (10n ** BigInt(decimals));
+            console.log(`[SpinForAll] Filtering for holders with > ${MINIMUM_UI_AMOUNT.toLocaleString()} tokens.`);
+            console.log("[SpinForAll] Fetching all token holders...");
+            const allHolders = await getAllTokenHolders(mintAddress);
+            console.log(`[SpinForAll] Found ${allHolders.length} total non-zero holders.`);
+            const eligibleHolders = allHolders.filter(holder => holder.balance > minBalanceRaw);
+            console.log(`[SpinForAll] Found ${eligibleHolders.length} holders meeting the criteria.`);
+            if (eligibleHolders.length === 0) { console.log("[SpinForAll] No eligible holders found. Aborting."); return; }
+            console.log(`[SpinForAll] Scheduling spins for ${eligibleHolders.length} holders with a 1-minute interval...`);
+            let scheduledCount = 0; let delay = 0;
+            const SPIN_INTERVAL_MS = 1 * 60 * 1000; // 1 minute
+            for (const holder of eligibleHolders) {
+                if (holder.address === devWallet.publicKey.toBase58() || holder.address === config.JACKPOT_WALLET_ADDRESS) { console.log(`[SpinForAll] Skipping spin for operational wallet: ${holder.address.slice(0, 6)}`); continue; }
+                const betAmount = Number(holder.balance) / (10 ** decimals);
+                if (betAmount <= 0) continue;
+                const scheduleSpin = (h, bA) => {
+                    setTimeout(() => {
+                        console.log(`[SpinForAll] [Delayed Queue] Adding spin for ${h.address.slice(0, 6)} to the queue. Bet: ${bA.toFixed(2)}`);
+                        spinQueue.push(() => executeSpin(h.address, bA, { skipHolderCheck: true, isHolderSpin: true }));
+                    }, delay);
+                };
+                scheduleSpin(holder, betAmount);
+                delay += SPIN_INTERVAL_MS;
+                scheduledCount++;
+            }
+            console.log(`[SpinForAll] Successfully scheduled ${scheduledCount} spins. They will be added to the queue one by one, every minute. Total estimated duration: ~${Math.round(delay / 60000)} minutes.`);
+        } catch (error) { console.error("[SpinForAll] An error occurred during the spin-for-all-holders process:", error); }
+    })();
 });
 
 // =======================================================================
@@ -644,14 +589,9 @@ app.post('/api/update-config', (req, res) => {
 async function startup() {
     console.log('Server starting up...');
     app.use(express.static(path.join(__dirname, 'public')));
-    
     loadState();
     buildWeightedReel();
-    
-    if (!initializeWalletAndConnection()) {
-        console.error("🚨 CRITICAL: Could not initialize wallet on startup.");
-    }
-    
+    if (!initializeWalletAndConnection()) console.error("🚨 CRITICAL: Could not initialize wallet on startup.");
     await getJackpotBalance();
     jackpotInterval = setInterval(getJackpotBalance, JACKPOT_UPDATE_INTERVAL_MS);
     connectToPumpPortal();
@@ -662,22 +602,15 @@ function gracefulShutdown(signal) {
     if (isShuttingDown) return;
     isShuttingDown = true;
     console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
-
     clearInterval(heartbeatInterval);
     clearInterval(jackpotInterval);
     if (pumpWs) pumpWs.close();
     server.close(() => console.log("HTTP server closed."));
     wss.clients.forEach(client => client.terminate());
-
-    for (const [, spin] of pendingSpins.entries()) {
-        clearTimeout(spin.timerId);
-    }
-
+    for (const [, spin] of pendingSpins.entries()) clearTimeout(spin.timerId);
     console.log("Saving final state to disk...");
     saveState();
-
     const shutdownInterval = setInterval(() => {
-        // ## FIXED: More robust check for active tasks ##
         if (spinQueue.queue.length === 0 && !spinQueue.isProcessing) {
             clearInterval(shutdownInterval);
             console.log("✅ All queued tasks completed. Exiting now.");
@@ -685,11 +618,7 @@ function gracefulShutdown(signal) {
         }
         console.log(`Waiting for ${spinQueue.queue.length + (spinQueue.isProcessing ? 1 : 0)} task(s) to complete...`);
     }, 500);
-
-    setTimeout(() => {
-        console.error("Graceful shutdown timed out. Forcing exit.");
-        process.exit(1);
-    }, 20000);
+    setTimeout(() => { console.error("Graceful shutdown timed out. Forcing exit."); process.exit(1); }, 20000);
 }
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

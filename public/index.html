@@ -97,6 +97,13 @@
         .fa-gem { color: #d755ff; } .fa-diamond { color: #00f6ff; } .fa-star { color: #ffc800; } .fa-heart { color: #ff2a6d; } .fa-bell { color: #ff9a00; } .fa-clover { color: #00ff6a; } .fa-lemon { color: #f8ff38; } .fa-skull { color: #6c757d; }
         
         #current-spinner-address { font-size: clamp(0.75rem, 2.5vw, 0.9rem); color: var(--text-muted); text-shadow: 0 0 5px rgba(0, 229, 255, 0.5); margin-top: 1rem; min-height: 20px; opacity: 0; transition: opacity 0.5s ease; word-break: break-all; text-align: center; }
+        /* ## UPDATED: Style for the "HOLDER SPIN" text ## */
+        #current-spinner-address strong {
+            color: var(--holo-gold);
+            text-shadow: 0 0 8px var(--holo-gold);
+            margin-right: 0.5rem;
+            text-transform: uppercase;
+        }
         #result-message { font-size: clamp(1rem, 4vw, 1.4rem); text-transform: uppercase; min-height: 30px; transition: all 0.3s; letter-spacing: 1px; text-align: center; }
         .win-text { color: var(--win-color); text-shadow: 0 0 12px var(--win-color); transform: scale(1.05); }
         .lose-text { color: var(--lose-color); text-shadow: 0 0 12px var(--lose-color); }
@@ -112,7 +119,6 @@
         .rule-icon { margin-right: 0.75rem; color: var(--holo-cyan); width: 20px; text-align: center; margin-top: 2px; flex-shrink: 0; }
         .paytable-main-icon { text-align: center; }
 
-        /* --- STARTUP OVERLAY --- */
         #audio-unlock-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(1, 4, 10, 0.95); backdrop-filter: blur(10px); display: flex; justify-content: center; align-items: center; z-index: 100; padding: 1rem; opacity: 1; transition: opacity 0.5s ease-out; }
         .startup-box { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; width: 100%; max-width: 500px; padding: 2.5rem 2rem; background: linear-gradient(145deg, rgba(15, 23, 36, 0.5), rgba(12, 16, 22, 0.5)); border: 1px solid var(--machine-border); box-shadow: 0 0 40px rgba(0,0,0,0.5), inset 0 0 30px rgba(0,0,0,0.4); animation: startup-fade-in 1s ease-out; overflow: hidden; }
         #startup-logo { max-width: 220px; width: 70%; margin-bottom: 1.5rem; opacity: 0; animation: startup-fade-in 1.2s 0.8s forwards; }
@@ -121,78 +127,16 @@
         #connect-button { font-family: 'Orbitron', sans-serif; font-size: 1.25rem; color: var(--text-color); background: rgba(0, 229, 255, 0.1); border: 2px solid var(--holo-cyan); padding: 15px 35px; border-radius: 5px; cursor: pointer; text-transform: uppercase; letter-spacing: 2px; transition: all 0.3s ease; opacity: 0; box-shadow: 0 0 15px -4px var(--holo-cyan); animation: connect-pulse 2.5s 1.8s infinite, startup-fade-in 1s 1.8s forwards; }
         #connect-button:hover { background: var(--holo-cyan); color: var(--bg-color); box-shadow: 0 0 25px var(--holo-cyan), 0 0 10px var(--holo-cyan); }
         
-
-        /* =================================================================== */
-        /* === DEFINITIVE WIDESCREEN DESKTOP LAYOUT (min-width: 1024px) ====== */
-        /* =================================================================== */
         @media (min-width: 1024px) {
-            body {
-                justify-content: center; /* Center the entire console vertically */
-                padding: 1rem;
-            }
-
-            .console-container {
-                max-width: 1400px;
-                background: var(--machine-bg);
-                border: 1px solid var(--machine-border);
-                border-radius: 20px;
-                padding: 1.5rem;
-                box-shadow: 0 25px 70px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.05), inset 0 0 50px rgba(0,0,0,0.8);
-                
-                /* DYNAMIC SIZING: Use flexbox and viewport height to ensure it fits */
-                display: flex;
-                flex-direction: column;
-                height: calc(100vh - 2rem); /* Force height to fit screen, accounting for body padding */
-                max-height: 900px; /* Sanity check for extremely tall screens */
-            }
-
-            .top-section { flex-shrink: 0; /* Prevent this section from shrinking */ }
+            body { justify-content: center; padding: 1rem; }
+            .console-container { max-width: 1400px; background: var(--machine-bg); border: 1px solid var(--machine-border); border-radius: 20px; padding: 1.5rem; box-shadow: 0 25px 70px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.05), inset 0 0 50px rgba(0,0,0,0.8); display: flex; flex-direction: column; height: calc(100vh - 2rem); max-height: 900px; }
+            .top-section { flex-shrink: 0; }
             .main-screen { max-width: 650px; margin: 0 auto; }
-            .reel { 
-                 /* Tie reel size to viewport height for dynamic scaling */
-                width: clamp(100px, 15vh, 130px); 
-                height: clamp(100px, 15vh, 130px);
-            }
-
-            /* The 4-column grid for all informational panels */
-            .bottom-section-panels {
-                display: grid;
-                grid-template-columns: repeat(4, 1fr);
-                gap: 1.5rem;
-                margin-top: 0;
-                padding-top: 1.5rem;
-                border-top: 1px solid var(--machine-border);
-                
-                /* DYNAMIC SIZING: Allow this section to grow/shrink to fill available space */
-                flex-grow: 1;
-                min-height: 0; /* Required for flex-grow to work correctly with overflow */
-            }
-
-            .info-panel {
-                background: var(--panel-bg-light);
-                border-radius: 15px;
-                padding: 1rem;
-                
-                /* DYNAMIC SIZING: Use flexbox to manage internal content height */
-                display: flex;
-                flex-direction: column;
-                min-height: 0;
-            }
-
-            .info-panel h3 {
-                font-size: 1rem;
-                margin-bottom: 0.75rem;
-                padding-bottom: 0.5rem;
-                flex-shrink: 0; /* Prevent headers from shrinking */
-            }
-            
-            /* CRITICAL: This makes all lists scrollable within their panels */
-            .info-panel ul {
-                overflow-y: auto; /* Enable vertical scrolling */
-                flex-grow: 1; /* Allow list to fill available space */
-                padding-right: 0.5rem; /* Space for scrollbar */
-            }
-
+            .reel { width: clamp(100px, 15vh, 130px); height: clamp(100px, 15vh, 130px); }
+            .bottom-section-panels { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-top: 0; padding-top: 1.5rem; border-top: 1px solid var(--machine-border); flex-grow: 1; min-height: 0; }
+            .info-panel { background: var(--panel-bg-light); border-radius: 15px; padding: 1rem; display: flex; flex-direction: column; min-height: 0; }
+            .info-panel h3 { font-size: 1rem; margin-bottom: 0.75rem; padding-bottom: 0.5rem; flex-shrink: 0; }
+            .info-panel ul { overflow-y: auto; flex-grow: 1; padding-right: 0.5rem; }
             .info-panel li, .info-panel .paytable-item { font-size: 0.85rem; }
             .rules-list { font-size: 0.9rem; }
         }
@@ -339,7 +283,13 @@
             for (const name of outcome.symbols) { if (SYMBOLS.findIndex(s => s.name === name) === -1) { console.error(`Symbol '${name}' from backend not found in frontend. Aborting spin.`); isAnimating = false; return; } }
             isAnimating = true;
 
-            if (outcome.traderPublicKey) { spinnerAddressDisplay.textContent = `Spinning for: ${outcome.traderPublicKey}`; spinnerAddressDisplay.style.opacity = '1'; }
+            // ## UPDATED: Check for isHolderSpin and update text ##
+            if (outcome.traderPublicKey) {
+                const spinType = outcome.isHolderSpin ? 'HOLDER SPIN' : 'Spinning';
+                spinnerAddressDisplay.innerHTML = `<strong>${spinType}</strong> for: ${outcome.traderPublicKey}`;
+                spinnerAddressDisplay.style.opacity = '1';
+            }
+            
             playSound('spin-start');
             resultMessage.textContent = `Transmitting...`;
             resultMessage.className = '';
@@ -383,7 +333,7 @@
                 if (!isAnimating) {
                     resultMessage.textContent = "Awaiting Signal...";
                     resultMessage.className = '';
-                    spinnerAddressDisplay.textContent = '';
+                    spinnerAddressDisplay.innerHTML = ''; // ## UPDATED: Use innerHTML to clear
                     spinnerAddressDisplay.style.opacity = '0';
                 }
             }, 5000);
@@ -391,7 +341,10 @@
 
         function showPayoutFailure(payload) {
             isAnimating = true;
-            if (payload.traderPublicKey) { spinnerAddressDisplay.textContent = `Payout Failed for: ${payload.traderPublicKey}`; spinnerAddressDisplay.style.opacity = '1'; }
+            if (payload.traderPublicKey) {
+                spinnerAddressDisplay.innerHTML = `Payout Failed for: ${payload.traderPublicKey}`; // ## UPDATED: Use innerHTML
+                spinnerAddressDisplay.style.opacity = '1';
+            }
             resultMessage.textContent = `WIN! PAYOUT FAILED`;
             resultMessage.className = 'payout-fail-text';
             playSound('error');
@@ -399,7 +352,7 @@
             setTimeout(() => {
                 resultMessage.textContent = "Awaiting Signal...";
                 resultMessage.className = '';
-                spinnerAddressDisplay.textContent = '';
+                spinnerAddressDisplay.innerHTML = ''; // ## UPDATED: Use innerHTML to clear
                 spinnerAddressDisplay.style.opacity = '0';
                 isAnimating = false;
                 setTimeout(processNextEvent, 1000);
